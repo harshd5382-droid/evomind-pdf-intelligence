@@ -1,0 +1,66 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a0e1a"/>
+      <stop offset="0.55" stop-color="#0f1629"/>
+      <stop offset="1" stop-color="#1a1033"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="900" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="0.5" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#172033"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6366f1" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <ellipse cx="1050" cy="150" rx="420" ry="340" fill="url(#glow)"/>
+  <ellipse cx="200" cy="560" rx="380" ry="300" fill="url(#glow)" opacity="0.7"/>
+
+  <!-- dotted grid texture -->
+  <g fill="#334155" opacity="0.25">
+    <circle cx="60" cy="60" r="2"/><circle cx="140" cy="60" r="2"/><circle cx="220" cy="60" r="2"/>
+    <circle cx="60" cy="140" r="2"/><circle cx="140" cy="140" r="2"/>
+    <circle cx="1220" cy="60" r="2"/><circle cx="1140" cy="60" r="2"/>
+    <circle cx="1220" cy="580" r="2"/><circle cx="1140" cy="580" r="2"/><circle cx="1060" cy="580" r="2"/>
+  </g>
+
+  <!-- brain mark -->
+  <text x="640" y="190" font-size="92" text-anchor="middle">🧠</text>
+
+  <!-- title -->
+  <text x="640" y="300" font-size="78" font-weight="800" text-anchor="middle" fill="url(#title)" letter-spacing="-1">EvoMind PDF Intelligence</text>
+
+  <!-- tagline -->
+  <text x="640" y="352" font-size="27" font-weight="400" text-anchor="middle" fill="#cbd5e1">An autonomous research agent that reads your PDFs, asks its own</text>
+  <text x="640" y="388" font-size="27" font-weight="400" text-anchor="middle" fill="#cbd5e1">questions, and grows a living knowledge graph.</text>
+
+  <!-- loop pipeline -->
+  <g transform="translate(640, 470)" text-anchor="middle">
+    <g font-size="20" font-weight="600" fill="#e2e8f0">
+      <g transform="translate(-512,0)"><rect x="-58" y="-26" width="116" height="52" rx="26" fill="url(#pill)" stroke="#6366f1" stroke-opacity="0.5"/><text y="7">Ingest</text></g>
+      <g transform="translate(-336,0)"><rect x="-66" y="-26" width="132" height="52" rx="26" fill="url(#pill)" stroke="#6366f1" stroke-opacity="0.5"/><text y="7">Question</text></g>
+      <g transform="translate(-160,0)"><rect x="-52" y="-26" width="104" height="52" rx="26" fill="url(#pill)" stroke="#6366f1" stroke-opacity="0.5"/><text y="7">Solve</text></g>
+      <g transform="translate(16,0)"><rect x="-58" y="-26" width="116" height="52" rx="26" fill="url(#pill)" stroke="#6366f1" stroke-opacity="0.5"/><text y="7">Reflect</text></g>
+      <g transform="translate(208,0)"><rect x="-80" y="-26" width="160" height="52" rx="26" fill="url(#pill)" stroke="#38bdf8" stroke-opacity="0.5"/><text y="7">Synthesize</text></g>
+      <g transform="translate(392,0)"><rect x="-50" y="-26" width="100" height="52" rx="26" fill="url(#pill)" stroke="#38bdf8" stroke-opacity="0.5"/><text y="7">Score</text></g>
+    </g>
+    <g fill="#64748b" font-size="22">
+      <text x="-420" y="7">→</text><text x="-244" y="7">→</text><text x="-68" y="7">→</text><text x="112" y="7">→</text><text x="304" y="7">→</text>
+    </g>
+    <text x="450" y="7" font-size="20" fill="#a78bfa">↻</text>
+  </g>
+
+  <!-- footer stack -->
+  <text x="640" y="572" font-size="19" font-weight="500" text-anchor="middle" fill="#94a3b8" letter-spacing="0.5">FastAPI · Next.js · Postgres · Qdrant · Neo4j · Redis · NVIDIA NIM · MIT License</text>
+</svg>
