@@ -39,11 +39,20 @@ learning while you sleep.
 
 ## 📸 Demo
 
-> _Screenshots coming soon — drop yours into `docs/screenshots/` and update the links below._
+<!--
+  To add screenshots: run the app, capture each page, and save the PNGs as
+  docs/screenshots/dashboard.png, feed.png, and graph.png. They will render
+  automatically below. Until then, the captions describe each view.
+-->
 
-| Dashboard | Research Feed | Knowledge Graph |
-|-----------|---------------|-----------------|
-| <!-- TODO: ![dashboard](docs/screenshots/dashboard.png) --> _live metrics & intelligence score_ | <!-- TODO: ![feed](docs/screenshots/feed.png) --> _real-time SSE event stream_ | <!-- TODO: ![graph](docs/screenshots/graph.png) --> _papers ↔ concepts ↔ hypotheses_ |
+### Dashboard — live metrics & intelligence score
+<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
+
+### Research Feed — real-time SSE event stream
+<!-- ![Research Feed](docs/screenshots/feed.png) -->
+
+### Knowledge Graph — papers ↔ concepts ↔ hypotheses
+<!-- ![Knowledge Graph](docs/screenshots/graph.png) -->
 
 ---
 
