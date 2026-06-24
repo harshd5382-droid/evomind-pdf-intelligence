@@ -58,7 +58,6 @@
     <g fill="#64748b" font-size="22">
       <text x="-420" y="7">→</text><text x="-244" y="7">→</text><text x="-68" y="7">→</text><text x="112" y="7">→</text><text x="304" y="7">→</text>
     </g>
-    <text x="450" y="7" font-size="20" fill="#a78bfa">↻</text>
   </g>
 
   <!-- footer stack -->
