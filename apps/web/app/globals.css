@@ -2,17 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+/* Light mode (default) */
+:root {
+  --color-bg:     245 247 250;
+  --color-panel:  255 255 255;
+  --color-panel2: 240 244 248;
+  --color-border: 203 213 225;
+  --color-ink:    15 23 42;
+  --color-sub:    71 85 105;
+  --color-dim:    148 163 184;
+  color-scheme: light;
+}
+
+/* Dark mode */
+.dark {
+  --color-bg:     3 9 19;
+  --color-panel:  7 18 32;
+  --color-panel2: 12 28 51;
+  --color-border: 27 50 87;
+  --color-ink:    220 232 245;
+  --color-sub:    122 155 190;
+  --color-dim:    61 90 122;
+  color-scheme: dark;
+}
 
 html, body { height: 100%; }
 
 body {
-  background-color: #030913;
+  background-color: rgb(var(--color-bg));
   background-image:
-    linear-gradient(rgba(27, 50, 87, 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(27, 50, 87, 0.28) 1px, transparent 1px);
+    linear-gradient(rgb(var(--color-border) / 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-border) / 0.28) 1px, transparent 1px);
   background-size: 48px 48px;
-  color: #DCE8F5;
+  color: rgb(var(--color-ink));
   font-family: var(--font-bricolage), system-ui, sans-serif;
   font-size: 14px;
 }
@@ -22,17 +44,17 @@ h1, h2, h3, h4, h5 {
   font-family: var(--font-spectral), Georgia, serif;
 }
 
-::selection { background: rgba(201, 162, 39, 0.28); color: #DCE8F5; }
+::selection { background: rgba(201, 162, 39, 0.28); color: rgb(var(--color-ink)); }
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: #1B3257; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--color-border)); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* Base card class used by Card component */
 .card {
-  background: rgba(7, 18, 32, 0.9);
-  border: 1px solid #1B3257;
+  background: rgb(var(--color-panel) / 0.9);
+  border: 1px solid rgb(var(--color-border));
   backdrop-filter: blur(16px);
 }
 
@@ -68,7 +90,7 @@ h1, h2, h3, h4, h5 {
 }
 
 /* Thin horizontal rule */
-.rule { border: none; border-top: 1px solid #1B3257; }
+.rule { border: none; border-top: 1px solid rgb(var(--color-border)); }
 
 /* Feed event terminal rows */
 .feed-row { font-family: var(--font-jetbrains), monospace; }

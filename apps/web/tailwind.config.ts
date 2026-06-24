@@ -6,10 +6,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg:       "#030913",
-        panel:    "#071220",
-        panel2:   "#0C1C33",
-        border:   "#1B3257",
+        bg:       "rgb(var(--color-bg) / <alpha-value>)",
+        panel:    "rgb(var(--color-panel) / <alpha-value>)",
+        panel2:   "rgb(var(--color-panel2) / <alpha-value>)",
+        border:   "rgb(var(--color-border) / <alpha-value>)",
         accent:   "#C9A227",
         "accent-lo": "rgba(201,162,39,0.12)",
         accent2:  "#60A5FA",
@@ -17,9 +17,9 @@ export default {
         ok:       "#34D399",
         warn:     "#FBBF24",
         bad:      "#FB7185",
-        ink:      "#DCE8F5",
-        sub:      "#7A9BBE",
-        dim:      "#3D5A7A",
+        ink:      "rgb(var(--color-ink) / <alpha-value>)",
+        sub:      "rgb(var(--color-sub) / <alpha-value>)",
+        dim:      "rgb(var(--color-dim) / <alpha-value>)",
       },
       fontFamily: {
         sans:    ["var(--font-bricolage)", "system-ui", "sans-serif"],
