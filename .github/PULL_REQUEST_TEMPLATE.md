@@ -16,7 +16,7 @@
 
 ## Checklist
 - [ ] My change is focused and scoped to one thing
-- [ ] Frontend: `npm run lint` and `npm run build` pass (if applicable)
+- [ ] Frontend: `npm run build` succeeds (if applicable)
 - [ ] Backend: imports cleanly / runs locally (if applicable)
 - [ ] I did **not** commit any secrets, `.env`, or credentials
 - [ ] I respected the provider-router / hybrid-retrieval / parser-fallback patterns (see CONTRIBUTING.md)

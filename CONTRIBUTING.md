@@ -55,8 +55,7 @@ uvicorn app.main:app --reload --port 8000          # http://localhost:8000/docs
 cd apps/web
 npm install
 npm run dev        # http://localhost:3000
-npm run lint       # please run before pushing
-npm run build      # must succeed (CI runs this)
+npm run build      # must succeed (CI runs this; also type-checks the app)
 ```
 
 ---
@@ -110,7 +109,7 @@ These are load-bearing — please don't bypass them without discussion:
    - `docs/<short-name>` for documentation
 2. Make focused commits with clear messages (present tense, e.g. `fix: dedupe near-duplicate questions`).
 3. Before opening the PR, confirm:
-   - [ ] `npm run lint` and `npm run build` pass (for frontend changes)
+   - [ ] `npm run build` succeeds (for frontend changes)
    - [ ] Backend imports cleanly (`python -m compileall app` from `apps/api`)
    - [ ] **No secrets committed** — never commit `.env`, API keys, or credentials
    - [ ] Docs updated if behavior changed

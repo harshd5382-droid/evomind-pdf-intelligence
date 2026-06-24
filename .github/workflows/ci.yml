@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   web:
-    name: Web (lint + build)
+    name: Web (build + type-check)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,9 +25,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
+      # `next build` type-checks the whole app. ESLint is not yet configured
+      # in this project, so linting is intentionally left out of CI for now.
       - name: Build
         run: npm run build
 
