@@ -1,0 +1,40 @@
+# Env
+.env
+*.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+out/
+.eslintcache
+*.tsbuildinfo
+
+# Data — never commit ingested PDFs, local DBs, or the drop folder
+data/
+apps/api/data/
+apps/api/data/uploads/
+*.sqlite
+*.db
+
+# Logs / local artifacts
+.codex-logs/
+*.log
+
+# Claude Code project metadata
+.claude/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Keep the screenshots placeholder tracked
+!docs/screenshots/.gitkeep
