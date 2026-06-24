@@ -1,5 +1,7 @@
 <div align="center">
 
+![EvoMind PDF Intelligence](docs/banner.png)
+
 # 🧠 EvoMind PDF Intelligence
 
 ### An autonomous research agent that reads your PDFs, asks its own questions, and grows a living knowledge graph.
