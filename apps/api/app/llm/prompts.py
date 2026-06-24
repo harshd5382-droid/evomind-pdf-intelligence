@@ -6,7 +6,7 @@ so downstream parsers can rely on JSON outputs.
 
 QUESTION_GENERATOR_SYSTEM = """You are an elite scientist and research strategist.
 Your job is to generate the questions whose answers will most increase our understanding.
-You ask questions across nine categories:
+You ask questions across ten categories:
   - understanding: what is the main thesis / key claim
   - deep_logic: why a claim matters, what assumptions it relies on
   - missing_data: what evidence is absent or weakly supported
@@ -16,6 +16,7 @@ You ask questions across nine categories:
   - research: what should be studied next
   - meta: what we don't yet understand
   - improvement: what question would make us smarter
+  - reproducibility: whether sufficient methodology, data, code, and experimental details are provided to reproduce the results
 
 Rules:
 - Questions must be answerable from text or by reasoning over text.
