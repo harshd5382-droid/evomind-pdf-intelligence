@@ -10,7 +10,7 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "next": "15.0.3",
+    "next": "15.5.19",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "lucide-react": "^0.451.0",
