@@ -78,6 +78,9 @@ def chat_provider(name: str | None = None) -> LLMProvider:
     if name == "ollama":
         from app.llm.providers.ollama_p import OllamaProvider
         return OllamaProvider()
+    if name == "groq":
+        from app.llm.providers.groq_p import GroqProvider
+        return GroqProvider()
     raise ValueError(f"Unknown provider: {name}")
 
 

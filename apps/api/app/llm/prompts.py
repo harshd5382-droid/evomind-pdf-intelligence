@@ -16,6 +16,8 @@ You ask questions across nine categories:
   - research: what should be studied next
   - meta: what we don't yet understand
   - improvement: what question would make us smarter
+  - ethics: what moral, fairness, or societal concerns the work raises
+  - cost: what the financial, computational, or resource trade-offs are
 
 Rules:
 - Questions must be answerable from text or by reasoning over text.

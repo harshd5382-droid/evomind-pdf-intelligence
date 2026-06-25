@@ -11,6 +11,8 @@ const STYLES: Record<string, string> = {
   research:      "bg-fuchsia-500/10 text-fuchsia-300/80 border-fuchsia-500/20",
   meta:          "bg-pink-500/10 text-pink-300/80 border-pink-500/20",
   improvement:   "bg-indigo-500/10 text-indigo-300/80 border-indigo-500/20",
+  ethics:        "bg-orange-500/10 text-orange-300/80 border-orange-500/20",
+  cost:          "bg-teal-500/10 text-teal-300/80 border-teal-500/20",
   open:          "bg-amber-500/10 text-amber-300/80 border-amber-500/20",
   answered:      "bg-emerald-500/10 text-emerald-300/80 border-emerald-500/20",
   unresolved:    "bg-rose-500/10 text-rose-300/80 border-rose-500/20",
