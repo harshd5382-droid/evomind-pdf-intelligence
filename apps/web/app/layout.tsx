@@ -34,9 +34,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`dark ${spectral.variable} ${dmSans.variable} ${jetbrains.variable}`}
+      className={`${spectral.variable} ${dmSans.variable} ${jetbrains.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Runs before paint to avoid flash — defaults to dark */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.classList.add(t);})();`,
+          }}
+        />
+      </head>
       <body className="min-h-screen" suppressHydrationWarning>
         <div className="flex">
           <Sidebar />

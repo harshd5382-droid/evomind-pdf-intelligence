@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Activity, HelpCircle, Network,
   BookOpenText, FileText, Settings as SettingsIcon, Brain,
+  Sun, Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -26,6 +27,18 @@ type ApStatus = { enabled: boolean; running: boolean };
 export function Sidebar() {
   const pathname = usePathname();
   const [ap, setAp] = useState<ApStatus | null>(null);
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }
 
   useEffect(() => {
     let alive = true;
@@ -94,6 +107,18 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Theme toggle */}
+      <div className="px-3 pb-3">
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-[11px] font-mono text-dim hover:text-sub transition-colors"
+          aria-label="Toggle theme"
+        >
+          {isDark ? <Sun className="w-3.5 h-3.5 shrink-0" /> : <Moon className="w-3.5 h-3.5 shrink-0" />}
+          <span>{isDark ? "Light mode" : "Dark mode"}</span>
+        </button>
+      </div>
 
       {/* Autopilot status */}
       <div className="px-3 pb-5">
