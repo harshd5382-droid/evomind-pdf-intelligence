@@ -1,0 +1,12 @@
+# Infrastructure clients for the full Docker Compose stack.
+# Installed in the image on top of requirements.txt so the api can reach
+# Postgres / Qdrant / Neo4j / Redis and the worker/beat services can run Celery.
+# Intentionally lean: the heavy/optional extras (torch via sentence-transformers,
+# llama-parse, alternate LLM providers) live in requirements-full.txt instead.
+
+psycopg[binary]==3.2.3
+alembic==1.13.3
+redis==5.1.1
+celery==5.4.0
+qdrant-client==1.12.0
+neo4j==5.25.0

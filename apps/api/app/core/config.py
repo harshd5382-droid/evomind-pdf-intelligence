@@ -4,13 +4,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 # Search candidates for the .env file: cwd, the api package root, the monorepo root.
+# Note: depth differs between a checkout (.../apps/api/app/core/config.py) and the
+# Docker image (/app/app/core/config.py), so guard each parent lookup against range.
 _HERE = Path(__file__).resolve()
-_CANDIDATES = [
-    Path.cwd() / ".env",
-    _HERE.parents[2] / ".env",  # apps/api/.env
-    _HERE.parents[3] / ".env",  # apps/.env
-    _HERE.parents[4] / ".env",  # repo root .env
-]
+_PARENTS = _HERE.parents
+_CANDIDATES = [Path.cwd() / ".env"]
+for _i in (2, 3, 4):  # apps/api/.env, apps/.env, repo-root/.env (when present)
+    if _i < len(_PARENTS):
+        _CANDIDATES.append(_PARENTS[_i] / ".env")
 
 
 class Settings(BaseSettings):
