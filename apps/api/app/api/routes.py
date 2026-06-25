@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import asyncio
 import hashlib
 import json
@@ -10,8 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse, JSONResponse
 from loguru import logger
 from sqlalchemy import select, desc, asc, func
 from sqlalchemy.orm import Session
@@ -101,6 +100,38 @@ def health():
         "providers": diag["providers"],
         "issues": diag["issues"],
     }
+    
+@router.get("/healthz")
+def healthz():
+    db = postgres.status()
+    redis = redis_client.status()
+    qdrant_store = qdrant.status()
+    neo4j = neo4j_store.status()
+
+    response = {
+        "postgres": "ok" if db["reachable"] else "degraded",
+        "redis": "ok" if redis["reachable"] else "degraded",
+        "qdrant": "ok" if qdrant_store["reachable"] else "degraded",
+        "neo4j": "ok" if neo4j["reachable"] else "degraded",
+    }
+
+    healthy = (
+        db["reachable"]
+        and redis["reachable"]
+        and qdrant_store["reachable"]
+        and neo4j["reachable"]
+    )
+    
+    return JSONResponse(
+        status_code=(
+            status.HTTP_200_OK
+            if healthy
+            else status.HTTP_503_SERVICE_UNAVAILABLE
+    ),
+    content=response,
+)
+    
+    
 
 
 @router.get("/diagnostics")
