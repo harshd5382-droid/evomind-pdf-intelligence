@@ -21,7 +21,7 @@ from app.llm.prompts import QUESTION_GENERATOR_SYSTEM, QUESTION_GENERATOR_USER
 VALID_CATEGORIES = {
     "understanding", "deep_logic", "missing_data", "contradiction",
     "math", "application", "research", "meta", "improvement",
-    "ethics", "cost",
+    "ethics", "cost", "reproducibility",
 }
 
 DEDUPE_SIM_THRESHOLD = 0.92  # cosine sim above which a candidate is considered a near-duplicate

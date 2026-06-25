@@ -13,6 +13,7 @@ const STYLES: Record<string, string> = {
   improvement:   "bg-indigo-500/10 text-indigo-300/80 border-indigo-500/20",
   ethics:        "bg-orange-500/10 text-orange-300/80 border-orange-500/20",
   cost:          "bg-teal-500/10 text-teal-300/80 border-teal-500/20",
+  reproducibility:"bg-sky-500/10 text-sky-300/80 border-sky-500/20",
   open:          "bg-amber-500/10 text-amber-300/80 border-amber-500/20",
   answered:      "bg-emerald-500/10 text-emerald-300/80 border-emerald-500/20",
   unresolved:    "bg-rose-500/10 text-rose-300/80 border-rose-500/20",
