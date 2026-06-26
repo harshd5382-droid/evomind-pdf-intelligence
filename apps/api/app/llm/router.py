@@ -243,6 +243,11 @@ def _record_usage(res: LLMResult, latency_ms: int, provider_name: str) -> None:
         u = res.usage or {}
         in_tok = int(u.get("input") or u.get("input_tokens") or u.get("prompt_tokens") or 0)
         out_tok = int(u.get("output") or u.get("output_tokens") or u.get("completion_tokens") or 0)
+        try:
+            from app.core.metrics import record_llm
+            record_llm(provider_name, _purpose_var.get(), latency_ms, in_tok, out_tok)
+        except Exception:
+            pass
         with postgres.session_scope() as s:
             s.add(Usage(
                 provider=provider_name,

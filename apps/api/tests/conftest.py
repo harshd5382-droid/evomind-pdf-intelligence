@@ -11,7 +11,10 @@ import os
 import tempfile
 
 # --- Zero-infra environment (must be set before importing app modules) ---
-_tmp = tempfile.TemporaryDirectory()
+# ignore_cleanup_errors: on Windows a lingering file handle (e.g. a backup zip
+# served via FileResponse) can make rmtree raise at session end; that must not
+# fail the suite.
+_tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
 _root = _tmp.name
 os.environ.setdefault("POSTGRES_DSN", f"sqlite:///{os.path.join(_root, 'test.db')}")
 os.environ.setdefault("REDIS_URL", "memory://")
@@ -35,7 +38,10 @@ def _init_db():
     postgres.init_db()
     yield
     postgres.engine.dispose()
-    _tmp.cleanup()
+    try:
+        _tmp.cleanup()
+    except Exception:
+        pass
 
 
 @pytest.fixture

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "INFO"
+    # Emit logs as JSON (one object per line) — useful behind Loki/ELK in prod.
+    log_json: bool = False
+    # Expose a Prometheus /metrics endpoint and record LLM/HTTP metrics.
+    metrics_enabled: bool = True
 
     # ─── Security ───────────────────────────────────────────────────────
     # Off by default so local/dev and the test suite are unaffected. When

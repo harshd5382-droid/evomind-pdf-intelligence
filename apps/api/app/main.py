@@ -95,6 +95,22 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+    # Request-ID middleware — assign/propagate a correlation id and bind it to
+    # logs for the duration of the request.
+    @app.middleware("http")
+    async def _request_id_mw(request, call_next):
+        import uuid as _uuid
+
+        from app.core.logging import request_id_var
+        rid = request.headers.get("X-Request-ID") or _uuid.uuid4().hex[:12]
+        token = request_id_var.set(rid)
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
+        response.headers["X-Request-ID"] = rid
+        return response
+
     # CORS: configurable origins. Credentials can't be combined with the "*"
     # wildcard per the CORS spec, so only enable them for explicit origins.
     origins = settings.cors_origin_list
@@ -106,6 +122,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router, prefix="/api")
+
+    # Prometheus metrics at /metrics (app-level HTTP metrics + our custom LLM
+    # series from app.core.metrics). Distinct from /api/metrics (intelligence
+    # score). Best-effort: never block startup if instrumentation fails.
+    if settings.metrics_enabled:
+        try:
+            from prometheus_fastapi_instrumentator import Instrumentator
+            Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+        except Exception as e:
+            logger.warning("Prometheus instrumentation skipped: {}", e)
 
     @app.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html():
