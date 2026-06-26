@@ -83,7 +83,11 @@ def test_chat_endpoint_roundtrip(client, clean_db, mocked_retrieval):
 
 
 def test_chat_endpoint_rejects_empty_message(client, clean_db):
+    # Empty string fails schema validation (min_length=1) → 422.
     res = client.post("/api/chat", json={"message": ""})
+    assert res.status_code == 422
+    # Whitespace-only passes the schema but is rejected by the handler → 400.
+    res = client.post("/api/chat", json={"message": "   "})
     assert res.status_code == 400
 
 

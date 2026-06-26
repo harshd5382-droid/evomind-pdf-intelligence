@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DocumentOut(BaseModel):
@@ -101,7 +101,7 @@ class JobOut(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=8000)
     conversation_id: str | None = None
 
 
@@ -136,9 +136,9 @@ class ConversationOut(BaseModel):
 
 
 class CycleRequest(BaseModel):
-    question_budget: int = 8
+    question_budget: int = Field(default=8, ge=1, le=100)
 
 
 class AnalyzeRequest(BaseModel):
     document_id: str
-    n_questions: int | None = None
+    n_questions: int | None = Field(default=None, ge=1, le=50)

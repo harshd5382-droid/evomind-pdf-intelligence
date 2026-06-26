@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
 from sqlalchemy import asc, desc, func, select
@@ -31,6 +31,8 @@ from app.api.schemas import (
 )
 from app.core.config import get_settings
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
+from app.core.ratelimit import limiter
+from app.core.security import require_api_key
 from app.db import neo4j_store, postgres, qdrant, redis_client
 from app.db.models import (
     Answer,
@@ -165,12 +167,12 @@ def integrity():
     return integrity_report(repair=False)
 
 
-@router.post("/integrity/repair")
+@router.post("/integrity/repair", dependencies=[Depends(require_api_key)])
 def integrity_repair():
     return integrity_report(repair=True)
 
 
-@router.post("/admin/reset-vector-store")
+@router.post("/admin/reset-vector-store", dependencies=[Depends(require_api_key)])
 def reset_vector_store():
     """Drop & recreate the Qdrant collection at the current embedding provider's dim.
 
@@ -258,7 +260,7 @@ def get_identity():
     return current_identity()
 
 
-@router.post("/identity/refresh")
+@router.post("/identity/refresh", dependencies=[Depends(require_api_key)])
 def refresh_identity():
     """Force an immediate identity recompile. Returns the new state."""
     import threading
@@ -283,7 +285,7 @@ def journal_recent(limit: int = Query(20, ge=1, le=100)):
     return {"items": recent_entries(limit=limit)}
 
 
-@router.post("/journal/write-now")
+@router.post("/journal/write-now", dependencies=[Depends(require_api_key)])
 def journal_write_now():
     """Force the agent to write a journal entry immediately."""
     import threading
@@ -309,7 +311,7 @@ def curiosity_gaps_endpoint(
     return {"items": current_gaps(limit=limit, kind=kind)}
 
 
-@router.post("/curiosity/recompute")
+@router.post("/curiosity/recompute", dependencies=[Depends(require_api_key)])
 def curiosity_recompute():
     """Force-recompute the gap snapshot now."""
     import threading
@@ -606,22 +608,51 @@ def _enqueue_ingest(file_path: str, doc_id: str, job_id: str) -> bool:
     return False
 
 
-@router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    s = get_settings()
-    Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
+def _validate_pdf_filename(file: UploadFile) -> None:
+    """Reject anything that isn't a PDF by extension or declared content type."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only .pdf files are accepted")
+    ctype = (file.content_type or "").lower()
+    if ctype and ctype not in ("application/pdf", "application/octet-stream"):
+        raise HTTPException(400, f"Unexpected content type for a PDF: {ctype}")
 
-    doc_id = str(uuid.uuid4())
-    safe_name = f"{doc_id}_{Path(file.filename).name}"
-    target = Path(s.upload_dir) / safe_name
+
+async def _save_upload(file: UploadFile, target: Path, max_bytes: int) -> None:
+    """Stream an upload to disk, enforcing a size cap and a %PDF magic check.
+
+    Aborts and removes the partial file if the cap is exceeded or the content
+    isn't actually a PDF (defends against a non-PDF renamed to .pdf)."""
+    written = 0
+    first = b""
     with target.open("wb") as f:
         while True:
             chunk = await file.read(1024 * 1024)
             if not chunk:
                 break
+            if not first:
+                first = chunk[:5]
+            written += len(chunk)
+            if written > max_bytes:
+                f.close()
+                target.unlink(missing_ok=True)
+                raise HTTPException(413, f"File exceeds the {max_bytes // (1024 * 1024)} MB limit")
             f.write(chunk)
+    if not first.startswith(b"%PDF"):
+        target.unlink(missing_ok=True)
+        raise HTTPException(400, "File does not look like a valid PDF (missing %PDF header)")
+
+
+@router.post("/upload", dependencies=[Depends(require_api_key)])
+@limiter.limit(get_settings().rate_limit_upload)
+async def upload_pdf(request: Request, file: UploadFile = File(...)):
+    s = get_settings()
+    Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
+    _validate_pdf_filename(file)
+
+    doc_id = str(uuid.uuid4())
+    safe_name = f"{doc_id}_{Path(file.filename).name}"
+    target = Path(s.upload_dir) / safe_name
+    await _save_upload(file, target, s.max_upload_mb * 1024 * 1024)
 
     # Dedup: hash the file we just wrote and look for an existing document
     # with identical content. If found, delete the duplicate copy from disk
@@ -662,7 +693,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     return {"document_id": doc_id, "job_id": job_id, "queued": queued, "duplicate": False}
 
 
-@router.post("/upload/batch")
+@router.post("/upload/batch", dependencies=[Depends(require_api_key)])
 async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     """Multi-file upload — used by the browser folder picker (webkitdirectory).
 
@@ -743,7 +774,7 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     }
 
 
-@router.post("/upload/folder")
+@router.post("/upload/folder", dependencies=[Depends(require_api_key)])
 def ingest_folder(payload: dict):
     """Ingest every PDF found under a server-side folder path.
 
@@ -754,6 +785,10 @@ def ingest_folder(payload: dict):
     recursive = bool((payload or {}).get("recursive", True))
     if not raw_path:
         raise HTTPException(400, "Missing 'path'")
+    # Reject path-traversal segments before resolving, so a caller can't walk
+    # up out of an intended directory via "..".
+    if ".." in Path(raw_path).parts:
+        raise HTTPException(400, "Path traversal ('..') is not allowed")
 
     folder = Path(raw_path).expanduser()
     if not folder.exists() or not folder.is_dir():
@@ -878,7 +913,7 @@ def get_document(doc_id: str, s: Session = Depends(_db)):
     return d
 
 
-@router.delete("/documents/{doc_id}")
+@router.delete("/documents/{doc_id}", dependencies=[Depends(require_api_key)])
 def delete_document(doc_id: str, s: Session = Depends(_db)):
     d = s.get(Document, doc_id)
     if not d:
@@ -1224,8 +1259,9 @@ def feed_recent(limit: int = 50):
 # hybrid retrieval + grounded answering (app.modules.chat) rather than
 # reimplementing it.
 
-@router.post("/chat", response_model=ChatReply)
-def chat(req: ChatRequest):
+@router.post("/chat", response_model=ChatReply, dependencies=[Depends(require_api_key)])
+@limiter.limit(get_settings().rate_limit_chat)
+def chat(request: Request, req: ChatRequest):
     from app.modules.chat import answer_chat
 
     message = (req.message or "").strip()
@@ -1267,7 +1303,7 @@ def conversation_messages(conversation_id: str, s: Session = Depends(_db)):
     return rows
 
 
-@router.delete("/chat/conversations/{conversation_id}")
+@router.delete("/chat/conversations/{conversation_id}", dependencies=[Depends(require_api_key)])
 def delete_conversation(conversation_id: str, s: Session = Depends(_db)):
     conv = s.get(Conversation, conversation_id)
     if conv is None:

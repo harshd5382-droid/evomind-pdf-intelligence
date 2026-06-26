@@ -26,6 +26,30 @@ class Settings(BaseSettings):
     api_port: int = 8000
     log_level: str = "INFO"
 
+    # ─── Security ───────────────────────────────────────────────────────
+    # Off by default so local/dev and the test suite are unaffected. When
+    # enabled, mutating + admin endpoints require a Bearer token (or X-API-Key
+    # header) present in `api_keys` (comma-separated).
+    auth_enabled: bool = False
+    api_keys: str = ""
+    # CORS: comma-separated allowed origins. "*" allows any (dev convenience).
+    cors_origins: str = "*"
+    # Uploads: reject files larger than this (defence against disk-fill).
+    max_upload_mb: int = 50
+    # Rate limiting (slowapi). Generous defaults; disable for load tests.
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "240/minute"
+    rate_limit_chat: str = "60/minute"
+    rate_limit_upload: str = "60/minute"
+
+    @property
+    def api_key_set(self) -> set[str]:
+        return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()] or ["*"]
+
     # Storage
     data_dir: str = "./data"
     upload_dir: str = "./data/uploads"

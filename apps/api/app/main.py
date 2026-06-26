@@ -6,11 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.responses import HTMLResponse
 from loguru import logger
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
 from app.core.diagnostics import collect_runtime_diagnostics
 from app.core.logging import configure_logging
+from app.core.ratelimit import limiter
 from app.db import postgres
 from app.modules import autopilot, folder_watcher
 
@@ -88,10 +91,17 @@ def create_app() -> FastAPI:
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=oauth2_redirect_url,
     )
+    # Rate limiting (slowapi) — attach the shared limiter + 429 handler.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # CORS: configurable origins. Credentials can't be combined with the "*"
+    # wildcard per the CORS spec, so only enable them for explicit origins.
+    origins = settings.cors_origin_list
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials=("*" not in origins),
         allow_methods=["*"],
         allow_headers=["*"],
     )
