@@ -146,6 +146,17 @@ class EvalRequest(BaseModel):
     sample_size: int = Field(default=20, ge=1, le=100)
 
 
+class ConfigUpdate(BaseModel):
+    """Runtime-overridable tuning knobs. All optional; only provided fields
+    change. Excludes provider/embedding settings (changing those at runtime
+    would corrupt the vector index)."""
+    questions_per_doc: int | None = Field(default=None, ge=1, le=50)
+    recursion_depth: int | None = Field(default=None, ge=0, le=6)
+    autonomy_level: str | None = Field(default=None, pattern="^(cautious|balanced|aggressive)$")
+    creativity: float | None = Field(default=None, ge=0.0, le=1.0)
+    confidence_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
 class CycleRequest(BaseModel):
     question_budget: int = Field(default=8, ge=1, le=100)
 

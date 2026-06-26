@@ -20,6 +20,7 @@ from app.api.schemas import (
     ChatMessageOut,
     ChatReply,
     ChatRequest,
+    ConfigUpdate,
     ConversationOut,
     CycleRequest,
     DocumentOut,
@@ -31,6 +32,7 @@ from app.api.schemas import (
     MemoryOut,
     QuestionOut,
 )
+from app.core.cache import ttl_cache
 from app.core.config import get_settings
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
 from app.core.ratelimit import limiter
@@ -199,6 +201,20 @@ def public_config():
         "confidence_threshold": s.confidence_threshold,
         "autopilot_enabled": s.autopilot_enabled,
     }
+
+
+@router.post("/config", dependencies=[Depends(require_api_key)])
+def update_config(req: ConfigUpdate):
+    """Apply runtime overrides for the tuning knobs. Takes effect immediately
+    for the autopilot (it reads settings live) but is NOT persisted across a
+    restart — set the corresponding env var in .env to make it permanent."""
+    s = get_settings()
+    changed = req.model_dump(exclude_none=True)
+    for field, val in changed.items():
+        setattr(s, field, val)
+    if changed:
+        logger.info("Runtime config updated: {}", changed)
+    return {"ok": True, "changed": changed, "config": public_config()}
 
 
 @router.get("/autopilot/status")
@@ -994,20 +1010,40 @@ def question_answers(qid: str, s: Session = Depends(_db)):
 
 @router.get("/questions/{qid}/tree")
 def question_tree(qid: str, s: Session = Depends(_db)):
-    """Recursive tree from a root question (depth limited)."""
-
-    def build(q: Question) -> dict:
-        children = s.execute(select(Question).where(Question.parent_id == q.id)).scalars().all()
-        return {
-            "id": q.id, "text": q.text, "category": q.category,
-            "status": q.status, "priority": q.priority, "depth": q.depth,
-            "children": [build(c) for c in children],
-        }
-
+    """Tree from a root question. Loads level-by-level (one query per depth via
+    parent_id IN (...)) instead of one query per node, avoiding the N+1 the
+    naive recursion caused."""
     root = s.get(Question, qid)
     if not root:
         raise HTTPException(404, "question not found")
-    return build(root)
+
+    def node(q: Question) -> dict:
+        return {
+            "id": q.id, "text": q.text, "category": q.category,
+            "status": q.status, "priority": q.priority, "depth": q.depth,
+            "children": [],
+        }
+
+    nodes = {root.id: node(root)}
+    frontier = [root.id]
+    seen = {root.id}
+    while frontier:
+        children = s.execute(
+            select(Question).where(Question.parent_id.in_(frontier))
+        ).scalars().all()
+        next_frontier: list[str] = []
+        for c in children:
+            if c.id in seen:  # guard against cycles
+                continue
+            seen.add(c.id)
+            cd = node(c)
+            nodes[c.id] = cd
+            parent = nodes.get(c.parent_id)
+            if parent is not None:
+                parent["children"].append(cd)
+            next_frontier.append(c.id)
+        frontier = next_frontier
+    return nodes[root.id]
 
 
 @router.post("/questions/{qid}/solve")
@@ -1111,12 +1147,17 @@ def report_markdown(insight_id: str, s: Session = Depends(_db)):
 
 
 # ------------- Metrics / Intelligence Score -------------
+@ttl_cache(5.0)
+def _metrics_payload() -> dict:
+    # Cached briefly: the dashboard polls this every few seconds and
+    # compute_score() scans several tables (and writes a snapshot row).
+    return {"current": compute_score(), "history": score_history(days=14)}
+
+
 @router.get("/metrics")
 def metrics():
     try:
-        snap = compute_score()
-        history = score_history(days=14)
-        return {"current": snap, "history": history}
+        return _metrics_payload()
     except Exception as e:
         logger.warning("Metrics unavailable: {}", e)
         return {"current": _empty_metrics_snapshot(), "history": []}

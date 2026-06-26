@@ -80,6 +80,41 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (math.sqrt(na) * math.sqrt(nb))
 
 
+def _batch_cosine(qv: list[float], vecs: list[list[float] | None]) -> list[float]:
+    """Cosine similarity of `qv` against many vectors at once.
+
+    Uses numpy for a single matrix op (much faster than the Python loop once the
+    memory cache grows past a few hundred items); falls back to the scalar
+    implementation if numpy is unavailable. Dim-mismatched / missing vectors
+    score 0.0, matching `_cosine`'s contract.
+    """
+    if not vecs:
+        return []
+    try:
+        import numpy as np
+
+        q = np.asarray(qv, dtype="float32")
+        qn = float(np.linalg.norm(q))
+        res = [0.0] * len(vecs)
+        if qn == 0.0:
+            return res
+        dim = q.shape[0]
+        rows, idx = [], []
+        for i, v in enumerate(vecs):
+            if v is not None and len(v) == dim:
+                rows.append(v); idx.append(i)
+        if rows:
+            mat = np.asarray(rows, dtype="float32")
+            norms = np.linalg.norm(mat, axis=1)
+            norms[norms == 0.0] = 1.0
+            sims = (mat @ q) / (norms * qn)
+            for j, i in enumerate(idx):
+                res[i] = float(sims[j])
+        return res
+    except Exception:
+        return [_cosine(qv, v) if v else 0.0 for v in vecs]
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -198,11 +233,10 @@ def search_memories(
             source_id=m["source_id"], score=0.0, created_at=m["created_at"],
         ) for m in sliced if (not layers or m["layer"] in layers)]
 
+    candidates = [m for m in items if not layers or m["layer"] in layers]
+    sims = _batch_cosine(qv, [m["embedding"] for m in candidates])
     scored: list[tuple[float, dict]] = []
-    for m in items:
-        if layers and m["layer"] not in layers:
-            continue
-        sim = _cosine(qv, m["embedding"])
+    for m, sim in zip(candidates, sims):
         # Bias: more important memories get a small boost. Caps total at 1.
         boost = 0.10 * float(m["importance"] or 0.0)
         score = min(1.0, sim + boost)
