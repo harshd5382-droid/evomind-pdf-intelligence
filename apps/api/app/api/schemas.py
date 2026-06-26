@@ -135,6 +135,17 @@ class ConversationOut(BaseModel):
         from_attributes = True
 
 
+class FeedbackRequest(BaseModel):
+    target_kind: str = Field(pattern="^(answer|chat_message)$")
+    target_id: str = Field(min_length=1)
+    rating: int = Field(ge=-1, le=1)  # +1 up, -1 down (0 = clear)
+    note: str = Field(default="", max_length=2000)
+
+
+class EvalRequest(BaseModel):
+    sample_size: int = Field(default=20, ge=1, le=100)
+
+
 class CycleRequest(BaseModel):
     question_budget: int = Field(default=8, ge=1, le=100)
 

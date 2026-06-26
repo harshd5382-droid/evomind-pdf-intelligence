@@ -248,6 +248,22 @@ class ChatMessage(Base):
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
 
+class Feedback(Base):
+    """Human signal on an answer or a chat reply (thumbs up/down).
+
+    Feeds two things: the eval dashboard (approval rate over time) and the
+    training-corpus export (down-voted pairs can be excluded, up-voted kept).
+    """
+    __tablename__ = "feedback"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    target_kind: Mapped[str] = mapped_column(String(24))  # answer|chat_message
+    target_id: Mapped[str] = mapped_column(String(36), index=True)
+    rating: Mapped[int] = mapped_column(Integer)  # +1 up, -1 down
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Job(Base):
     __tablename__ = "jobs"
 

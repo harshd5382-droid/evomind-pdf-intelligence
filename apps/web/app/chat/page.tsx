@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, Send, FileText, Loader2 } from "lucide-react";
+import { MessageSquare, Send, FileText, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
@@ -14,6 +14,7 @@ type Citation = {
 };
 
 type Msg = {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
@@ -62,6 +63,7 @@ export default function ChatPage() {
       setMessages((m) => [
         ...m,
         {
+          id: reply.message_id,
           role: "assistant",
           content: reply.answer,
           citations: reply.citations,
@@ -191,12 +193,65 @@ function MessageBubble({ msg }: { msg: Msg }) {
           </div>
         )}
 
-        {!isUser && typeof msg.confidence === "number" && (
-          <div className="mt-1 font-mono text-[9px] text-dim uppercase tracking-[0.12em]">
-            confidence {(msg.confidence * 100).toFixed(0)}%
+        {!isUser && (
+          <div className="mt-1.5 flex items-center gap-3">
+            {typeof msg.confidence === "number" && (
+              <span className="font-mono text-[9px] text-dim uppercase tracking-[0.12em]">
+                confidence {(msg.confidence * 100).toFixed(0)}%
+              </span>
+            )}
+            {msg.id && <Feedback messageId={msg.id} />}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function Feedback({ messageId }: { messageId: string }) {
+  const [rated, setRated] = useState<1 | -1 | null>(null);
+
+  async function rate(rating: 1 | -1) {
+    if (rated) return;
+    setRated(rating);
+    try {
+      await api("/feedback", {
+        method: "POST",
+        body: JSON.stringify({
+          target_kind: "chat_message",
+          target_id: messageId,
+          rating,
+        }),
+      });
+    } catch {
+      setRated(null); // allow retry on failure
+    }
+  }
+
+  return (
+    <span className="flex items-center gap-1.5">
+      <button
+        onClick={() => rate(1)}
+        disabled={!!rated}
+        aria-label="Helpful"
+        className={
+          "text-dim hover:text-ok transition-colors disabled:cursor-default " +
+          (rated === 1 ? "text-ok" : "")
+        }
+      >
+        <ThumbsUp className="w-3 h-3" />
+      </button>
+      <button
+        onClick={() => rate(-1)}
+        disabled={!!rated}
+        aria-label="Not helpful"
+        className={
+          "text-dim hover:text-warn transition-colors disabled:cursor-default " +
+          (rated === -1 ? "text-warn" : "")
+        }
+      >
+        <ThumbsDown className="w-3 h-3" />
+      </button>
+    </span>
   );
 }

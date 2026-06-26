@@ -76,6 +76,12 @@ def daily_backup_task() -> dict:
     return create_backup()
 
 
+@celery.task(name="app.workers.tasks.eval_task")
+def eval_task() -> dict:
+    from app.modules.eval import run_eval
+    return run_eval()
+
+
 # ─── Autopilot tasks (periodic, idempotent) ───────────────────────────────
 @celery.task(name="app.workers.tasks.auto_seed_task")
 def auto_seed_task() -> dict:

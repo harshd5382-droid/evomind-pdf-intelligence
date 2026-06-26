@@ -23,6 +23,8 @@ from app.api.schemas import (
     ConversationOut,
     CycleRequest,
     DocumentOut,
+    EvalRequest,
+    FeedbackRequest,
     HypothesisOut,
     InsightOut,
     JobOut,
@@ -41,6 +43,7 @@ from app.db.models import (
     Contradiction,
     Conversation,
     Document,
+    Feedback,
     Hypothesis,
     Insight,
     Job,
@@ -1351,3 +1354,42 @@ def backup_download(backup_id: str):
     archive_base = backup_dir_path() / f"{backup_id}"
     zip_path = shutil.make_archive(str(archive_base), "zip", root_dir=str(folder))
     return FileResponse(zip_path, media_type="application/zip", filename=f"evomind-backup-{backup_id}.zip")
+
+
+# ─── Evaluation & feedback ─────────────────────────────────────────────────
+# Answer-quality eval (LLM judge over cited answers) + human thumbs feedback.
+
+@router.post("/eval/run", dependencies=[Depends(require_api_key)])
+def eval_run(req: EvalRequest | None = None):
+    from app.modules.eval import run_eval
+    return run_eval(sample_size=(req.sample_size if req else 20))
+
+
+@router.get("/eval/history")
+def eval_history_route(days: int = 30):
+    from app.modules.eval import eval_history
+    return eval_history(days=days)
+
+
+@router.post("/feedback")
+def submit_feedback(req: FeedbackRequest, s: Session = Depends(_db)):
+    fb = Feedback(
+        target_kind=req.target_kind, target_id=req.target_id,
+        rating=req.rating, note=req.note,
+    )
+    s.add(fb)
+    s.commit()
+    return {"ok": True, "id": fb.id}
+
+
+@router.get("/feedback/summary")
+def feedback_summary(s: Session = Depends(_db)):
+    up = s.query(func.count(Feedback.id)).filter(Feedback.rating > 0).scalar() or 0
+    down = s.query(func.count(Feedback.id)).filter(Feedback.rating < 0).scalar() or 0
+    total = up + down
+    return {
+        "up": int(up),
+        "down": int(down),
+        "total": int(total),
+        "approval_rate": round(up / total, 3) if total else 0.0,
+    }

@@ -33,6 +33,7 @@ celery.conf.beat_schedule = {
     "intelligence-snapshot":     {"task": "app.workers.tasks.snapshot_intelligence_task", "schedule": 300.0}, # every 5 min
     "daily-autonomous-research": {"task": "app.workers.tasks.daily_research_task",   "schedule": crontab(hour=4, minute=0)},
     "daily-backup":              {"task": "app.workers.tasks.daily_backup_task",     "schedule": crontab(hour=3, minute=30)},
+    "answer-quality-eval":       {"task": "app.workers.tasks.eval_task",             "schedule": crontab(hour=5, minute=0)},
 }
 
 import app.workers.tasks  # noqa: E402,F401  (registers tasks)

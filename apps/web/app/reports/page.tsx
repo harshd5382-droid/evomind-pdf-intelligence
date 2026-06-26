@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { apiOr } from "@/lib/api";
+import { api, apiOr } from "@/lib/api";
 import { formatRelative } from "@/lib/utils";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Gauge, Loader2 } from "lucide-react";
 
 type Insight = { id: string; title: string; body: string; kind: string; created_at: string };
+
+type EvalSnap = {
+  faithfulness: number;
+  grounded_rate: number;
+  citation_coverage: number;
+  sample_size: number;
+};
+type EvalHistItem = { t: string; value: number; extra: EvalSnap };
+type FeedbackSummary = { up: number; down: number; total: number; approval_rate: number };
 
 export default function ReportsPage() {
   const [insights, setInsights] = useState<Insight[]>([]);
@@ -39,6 +48,8 @@ export default function ReportsPage() {
       </header>
 
       <hr className="rule mb-8" />
+
+      <QualityPanel />
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Insight list */}
@@ -101,6 +112,78 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function QualityPanel() {
+  const [snap, setSnap] = useState<EvalSnap | null>(null);
+  const [fb, setFb] = useState<FeedbackSummary | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function load() {
+    const [hist, summary] = await Promise.all([
+      apiOr<EvalHistItem[]>("/eval/history", []),
+      apiOr<FeedbackSummary>("/feedback/summary", { up: 0, down: 0, total: 0, approval_rate: 0 }),
+    ]);
+    setSnap(hist.length ? hist[hist.length - 1].extra : null);
+    setFb(summary);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function runEval() {
+    setRunning(true);
+    try {
+      await api("/eval/run", { method: "POST", body: JSON.stringify({ sample_size: 20 }) });
+      await load();
+    } catch {
+      /* surfaced by the empty state; auth may be required */
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const pct = (v: number | undefined) => (typeof v === "number" ? `${(v * 100).toFixed(0)}%` : "—");
+
+  return (
+    <section className="mb-8 border border-border bg-panel/60 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Gauge className="w-3.5 h-3.5 text-accent" />
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-dim">
+            Answer quality
+          </span>
+        </div>
+        <Button size="sm" variant="ghost" onClick={runEval} disabled={running}>
+          {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Gauge className="w-3 h-3" />}
+          Run eval
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Tile label="Faithfulness" value={pct(snap?.faithfulness)} />
+        <Tile label="Grounded rate" value={pct(snap?.grounded_rate)} />
+        <Tile label="Citation coverage" value={pct(snap?.citation_coverage)} />
+        <Tile
+          label="Approval"
+          value={fb && fb.total ? pct(fb.approval_rate) : "—"}
+          sub={fb ? `${fb.up}↑ / ${fb.down}↓` : undefined}
+        />
+      </div>
+      {!snap && (
+        <p className="font-mono text-[10px] text-dim mt-4">
+          No eval run yet — click “Run eval” to score recent answers for groundedness.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="border border-border/60 bg-bg/40 p-3">
+      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-dim mb-1.5">{label}</div>
+      <div className="font-display text-2xl font-light text-ink">{value}</div>
+      {sub && <div className="font-mono text-[9px] text-dim mt-1">{sub}</div>}
     </div>
   );
 }
