@@ -70,6 +70,12 @@ def snapshot_intelligence_task() -> dict:
     return compute_score()
 
 
+@celery.task(name="app.workers.tasks.daily_backup_task")
+def daily_backup_task() -> dict:
+    from app.modules.backup import create_backup
+    return create_backup()
+
+
 # ─── Autopilot tasks (periodic, idempotent) ───────────────────────────────
 @celery.task(name="app.workers.tasks.auto_seed_task")
 def auto_seed_task() -> dict:

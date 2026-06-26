@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from loguru import logger
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session
@@ -1311,3 +1311,43 @@ def delete_conversation(conversation_id: str, s: Session = Depends(_db)):
     s.delete(conv)
     s.commit()
     return {"ok": True}
+
+
+# ─── Backup / restore ──────────────────────────────────────────────────────
+# Postgres/SQLite is the source of truth; Qdrant + Neo4j are derivable and
+# captured best-effort. See app/modules/backup.
+
+@router.post("/backup/now", dependencies=[Depends(require_api_key)])
+def backup_now():
+    from app.modules.backup import create_backup
+    return create_backup()
+
+
+@router.get("/backup/status")
+def backup_status_route():
+    from app.modules.backup import backup_status
+    return backup_status()
+
+
+@router.get("/backup/list")
+def backup_list_route():
+    from app.modules.backup import list_backups
+    return list_backups()
+
+
+@router.get("/backup/{backup_id}/download", dependencies=[Depends(require_api_key)])
+def backup_download(backup_id: str):
+    import shutil
+
+    from app.modules.backup import backup_dir_path
+
+    # Reject anything that isn't a plain backup id (defends against traversal).
+    if "/" in backup_id or "\\" in backup_id or ".." in backup_id:
+        raise HTTPException(400, "invalid backup id")
+    folder = backup_dir_path() / backup_id
+    if not folder.is_dir():
+        raise HTTPException(404, "backup not found")
+
+    archive_base = backup_dir_path() / f"{backup_id}"
+    zip_path = shutil.make_archive(str(archive_base), "zip", root_dir=str(folder))
+    return FileResponse(zip_path, media_type="application/zip", filename=f"evomind-backup-{backup_id}.zip")
