@@ -24,13 +24,11 @@ import threading
 import time
 from contextvars import ContextVar
 from functools import lru_cache
-from typing import Optional
 
 from loguru import logger
 
 from app.core.config import get_settings
-from app.llm.base import LLMProvider, EmbeddingProvider, LLMResult
-
+from app.llm.base import EmbeddingProvider, LLMProvider, LLMResult
 
 # ---------------------------------------------------------------------------
 # Purpose attribution
@@ -46,7 +44,7 @@ class purpose:
         self.name = name
         self._token = None
 
-    def __enter__(self) -> "purpose":
+    def __enter__(self) -> purpose:
         self._token = _purpose_var.set(self.name)
         return self
 

@@ -19,7 +19,7 @@ import math
 import threading
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from loguru import logger
 from sqlalchemy import select
@@ -43,8 +43,8 @@ class MemoryHit:
     content: str
     layer: str
     importance: float
-    source_kind: Optional[str]
-    source_id: Optional[str]
+    source_kind: str | None
+    source_id: str | None
     score: float
     created_at: datetime
 
@@ -53,7 +53,7 @@ class MemoryHit:
 # Embedding
 # ---------------------------------------------------------------------------
 
-def _embed_one(text: str, *, kind: str = "passage") -> Optional[list[float]]:
+def _embed_one(text: str, *, kind: str = "passage") -> list[float] | None:
     """Embed a single string. Returns None on failure (caller decides
     whether to insert the memory anyway with a missing embedding)."""
     text = (text or "").strip()
@@ -88,11 +88,11 @@ def add_memory(
     content: str,
     *,
     layer: str = "long",
-    tags: Optional[list[str]] = None,
+    tags: list[str] | None = None,
     importance: float = 0.5,
-    source_kind: Optional[str] = None,
-    source_id: Optional[str] = None,
-) -> Optional[str]:
+    source_kind: str | None = None,
+    source_id: str | None = None,
+) -> str | None:
     """Insert a memory. Embeds the content (best-effort) and returns the new id.
 
     Returns None on failure. Idempotent on (source_kind, source_id) — if a
@@ -172,7 +172,7 @@ def search_memories(
     *,
     k: int = 5,
     min_score: float = 0.25,
-    layers: Optional[list[str]] = None,
+    layers: list[str] | None = None,
 ) -> list[MemoryHit]:
     """Return the top-K memories most semantically relevant to `query`.
 

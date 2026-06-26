@@ -141,7 +141,7 @@ def recover_orphaned_jobs() -> dict:
     from datetime import datetime
 
     from app.db import postgres
-    from app.db.models import Job, Document
+    from app.db.models import Document, Job
 
     requeued = 0
     abandoned = 0

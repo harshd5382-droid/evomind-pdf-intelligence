@@ -6,13 +6,14 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Activity, HelpCircle, Network,
   BookOpenText, FileText, Settings as SettingsIcon, Brain,
-  Sun, Moon,
+  MessageSquare, Sun, Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 const NAV = [
   { href: "/dashboard",  label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/chat",       label: "Ask EvoMind",     icon: MessageSquare   },
   { href: "/mind",       label: "Mind",            icon: Brain           },
   { href: "/feed",       label: "Research Feed",   icon: Activity        },
   { href: "/questions",  label: "Question Tree",   icon: HelpCircle      },

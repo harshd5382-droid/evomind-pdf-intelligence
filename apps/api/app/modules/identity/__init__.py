@@ -8,9 +8,9 @@ attends to. It is *not* a marketing widget — the solver reads from it,
 the questioner consults it, the journal narrates it.
 """
 from app.modules.identity.engine import (
-    update_identity,
     current_identity,
     narrative_summary,
+    update_identity,
 )
 
 __all__ = ["update_identity", "current_identity", "narrative_summary"]

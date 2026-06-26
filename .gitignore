@@ -6,8 +6,13 @@
 __pycache__/
 *.pyc
 .venv/
+.venv-test/
 venv/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
 
 # Node
 node_modules/

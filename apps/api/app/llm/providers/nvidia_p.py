@@ -13,7 +13,7 @@ from __future__ import annotations
 from loguru import logger
 
 from app.core.config import get_settings
-from app.llm.base import LLMProvider, LLMResult, EmbeddingProvider
+from app.llm.base import EmbeddingProvider, LLMProvider, LLMResult
 
 
 def _is_rate_limit_error(exc: BaseException) -> bool:

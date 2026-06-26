@@ -6,14 +6,14 @@ from pathlib import Path
 
 from loguru import logger
 
-from app.db import postgres, qdrant, neo4j_store, redis_client
-from app.db.models import Document, Chunk
-from app.ingestion.parser import parse_pdf
+from app.db import neo4j_store, postgres, qdrant, redis_client
+from app.db.models import Chunk, Document
 from app.ingestion.chunker import chunk_pages
 from app.ingestion.extractor import keywords_from_text
+from app.ingestion.parser import parse_pdf
 from app.llm import router as llm
-from app.llm.router import purpose
 from app.llm.prompts import CLASSIFY_SUBJECT_SYSTEM, CLASSIFY_SUBJECT_USER
+from app.llm.router import purpose
 
 
 def ingest_pdf(file_path: str | Path, document_id: str | None = None) -> str:

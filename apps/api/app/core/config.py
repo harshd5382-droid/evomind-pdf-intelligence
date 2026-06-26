@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Search candidates for the .env file: cwd, the api package root, the monorepo root.
 # Note: depth differs between a checkout (.../apps/api/app/core/config.py) and the
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     neo4j_password: str = "evomind123"
 
     # LLM Providers — set whichever you intend to use
-    primary_provider: str = "nvidia"  # nvidia | anthropic | openai | gemini | ollama 
+    primary_provider: str = "nvidia"  # nvidia | anthropic | openai | gemini | ollama
     embedding_provider: str = "nvidia"  # nvidia | local | openai
 
     anthropic_api_key: str | None = None
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
-    
+
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-1.5-pro"
 

@@ -7,7 +7,15 @@ from sqlalchemy import func
 
 from app.db import postgres
 from app.db.models import (
-    Document, Chunk, Question, Answer, Insight, Memory, Hypothesis, Contradiction, Metric,
+    Answer,
+    Chunk,
+    Contradiction,
+    Document,
+    Hypothesis,
+    Insight,
+    Memory,
+    Metric,
+    Question,
 )
 
 

@@ -8,7 +8,7 @@ on:
 
 jobs:
   web:
-    name: Web (build + type-check)
+    name: Web (lint + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,13 +25,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # `next build` type-checks the whole app. ESLint is not yet configured
-      # in this project, so linting is intentionally left out of CI for now.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # `next build` type-checks the whole app.
       - name: Build
         run: npm run build
 
   api:
-    name: API (syntax check)
+    name: API (lint + type-check + test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,8 +49,24 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install core dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Byte-compile (syntax smoke check)
-        run: python -m compileall app
+      - name: Lint (ruff)
+        run: ruff check app tests
+
+      # Type-checking is advisory while the codebase is annotated incrementally;
+      # it reports problems without failing the build yet.
+      - name: Type-check (mypy)
+        run: mypy app
+        continue-on-error: true
+
+      - name: Tests (pytest + coverage)
+        # Coverage floor starts low and should be ratcheted up over time.
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=30
+
+      # Dependency CVE scan is advisory — transitive advisories shouldn't block
+      # a feature PR, but we want them visible in the log.
+      - name: Dependency audit (pip-audit)
+        run: pip-audit || true
+        continue-on-error: true

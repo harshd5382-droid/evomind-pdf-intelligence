@@ -18,11 +18,11 @@ from app.core.config import get_settings
 
 _settings = get_settings()
 _real = None  # type: ignore[var-annotated]
-_memory: "_MemoryRedis | None" = None
+_memory: _MemoryRedis | None = None
 
 
 class _MemoryPubSub:
-    def __init__(self, broker: "_MemoryRedis", channel: str) -> None:
+    def __init__(self, broker: _MemoryRedis, channel: str) -> None:
         self._broker = broker
         self._channel = channel
         self._queue: deque[str] = deque()

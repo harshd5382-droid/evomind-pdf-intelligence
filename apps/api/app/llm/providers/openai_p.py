@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.core.config import get_settings
-from app.llm.base import LLMProvider, LLMResult, EmbeddingProvider
+from app.llm.base import EmbeddingProvider, LLMProvider, LLMResult
 
 
 class OpenAIProvider(LLMProvider):

@@ -27,18 +27,21 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timedelta
-from typing import Any
 
 from loguru import logger
-from sqlalchemy import select, func, desc, or_
+from sqlalchemy import func
 
 from app.db import postgres, redis_client
 from app.db.models import (
-    Document, Question, Answer, Hypothesis, Contradiction, CuriosityGap,
+    Answer,
+    Contradiction,
+    CuriosityGap,
+    Document,
+    Hypothesis,
+    Question,
 )
 from app.llm import router as llm
 from app.llm.router import purpose
-
 
 # ---------------------------------------------------------------------------
 # Gap scoring (no LLM calls)

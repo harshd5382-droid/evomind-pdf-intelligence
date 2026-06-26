@@ -24,18 +24,20 @@ from __future__ import annotations
 
 import random
 from datetime import datetime, timedelta
-from typing import Optional
 
 from loguru import logger
-from sqlalchemy import select, desc
 
 from app.db import postgres, redis_client
 from app.db.models import (
-    Journal, Insight, Hypothesis, Contradiction, Answer, Document,
+    Answer,
+    Contradiction,
+    Document,
+    Hypothesis,
+    Insight,
+    Journal,
 )
 from app.llm import router as llm
 from app.llm.router import purpose
-
 
 _JOURNAL_SYSTEM = (
     "You are the inner narrator of an autonomous research agent. You are "
@@ -49,7 +51,7 @@ _JOURNAL_SYSTEM = (
 )
 
 
-def _gather_context(since: Optional[datetime]) -> dict:
+def _gather_context(since: datetime | None) -> dict:
     """Pull what's new since the last entry. If there is no previous entry,
     pull the most-recent material from the past 24 hours."""
     horizon = since or (datetime.utcnow() - timedelta(hours=24))
@@ -122,13 +124,13 @@ def _format_user_prompt(ctx: dict) -> str:
     )
 
 
-def _last_entry_time() -> Optional[datetime]:
+def _last_entry_time() -> datetime | None:
     with postgres.session_scope() as s:
         row = s.query(Journal).order_by(Journal.created_at.desc()).first()
         return row.created_at if row else None
 
 
-def write_entry() -> Optional[str]:
+def write_entry() -> str | None:
     """Generate, persist, and memory-promote a new journal entry. Returns the new id."""
     last = _last_entry_time()
     ctx = _gather_context(last)

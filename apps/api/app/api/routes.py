@@ -1,29 +1,50 @@
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
-import os
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
-from sqlalchemy import select, desc, asc, func
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session
 
+from app.api.schemas import (
+    AnalyzeRequest,
+    AnswerOut,
+    ChatMessageOut,
+    ChatReply,
+    ChatRequest,
+    ConversationOut,
+    CycleRequest,
+    DocumentOut,
+    HypothesisOut,
+    InsightOut,
+    JobOut,
+    MemoryOut,
+    QuestionOut,
+)
 from app.core.config import get_settings
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
-from app.db import postgres, redis_client, neo4j_store, qdrant
+from app.db import neo4j_store, postgres, qdrant, redis_client
 from app.db.models import (
-    Document, Chunk, Question, Answer, Insight, Memory, Hypothesis, Job, Contradiction, Usage,
-)
-from app.api.schemas import (
-    DocumentOut, QuestionOut, AnswerOut, InsightOut, MemoryOut, HypothesisOut, JobOut,
-    CycleRequest, AnalyzeRequest,
+    Answer,
+    ChatMessage,
+    Chunk,
+    Contradiction,
+    Conversation,
+    Document,
+    Hypothesis,
+    Insight,
+    Job,
+    Memory,
+    Question,
+    Usage,
 )
 from app.modules.intelligence.scorer import compute_score, score_history
 from app.modules.questioner.engine import generate_for_document
@@ -51,7 +72,7 @@ def _db():
     yield from postgres.get_session()
 
 
-def _event_time_ms(event: dict, fallback_ms: Optional[int] = None) -> int:
+def _event_time_ms(event: dict, fallback_ms: int | None = None) -> int:
     for key in ("_t", "timestamp_ms", "timestamp", "ts", "created_at"):
         value = event.get(key)
         if value is None:
@@ -81,7 +102,7 @@ def _event_id(event: dict) -> str:
     return f"{event.get('type', 'event')}:{digest}"
 
 
-def _normalize_event(event: dict, *, fallback_ms: Optional[int] = None) -> dict:
+def _normalize_event(event: dict, *, fallback_ms: int | None = None) -> dict:
     ev = dict(event or {})
     ev["_t"] = _event_time_ms(ev, fallback_ms=fallback_ms)
     ev["_event_id"] = _event_id(ev)
@@ -100,7 +121,7 @@ def health():
         "providers": diag["providers"],
         "issues": diag["issues"],
     }
-    
+
 @router.get("/healthz")
 def healthz():
     db = postgres.status()
@@ -121,7 +142,7 @@ def healthz():
         and qdrant_store["reachable"]
         and neo4j["reachable"]
     )
-    
+
     return JSONResponse(
         status_code=(
             status.HTTP_200_OK
@@ -130,8 +151,8 @@ def healthz():
     ),
     content=response,
 )
-    
-    
+
+
 
 
 @router.get("/diagnostics")
@@ -188,6 +209,7 @@ def autopilot_run_now():
     bypassing the interval gate. Useful for impatient debugging — the loop
     runs every phase by itself anyway."""
     import threading
+
     from app.modules import autopilot
 
     def _all_phases():
@@ -217,6 +239,7 @@ def folder_watcher_status():
 def folder_watcher_scan_now():
     """Force an immediate scan of the auto-ingest folder."""
     from pathlib import Path
+
     from app.modules import folder_watcher
     s = get_settings()
     folder = Path(s.auto_ingest_dir).expanduser()
@@ -239,6 +262,7 @@ def get_identity():
 def refresh_identity():
     """Force an immediate identity recompile. Returns the new state."""
     import threading
+
     from app.modules.identity import update_identity
     # Run on a background thread — narrative LLM call can take a few seconds
     # and we don't want to block the request.
@@ -263,6 +287,7 @@ def journal_recent(limit: int = Query(20, ge=1, le=100)):
 def journal_write_now():
     """Force the agent to write a journal entry immediately."""
     import threading
+
     from app.modules.journal import write_entry
     def _run():
         try:
@@ -277,7 +302,7 @@ def journal_write_now():
 @router.get("/curiosity/gaps")
 def curiosity_gaps_endpoint(
     limit: int = Query(12, ge=1, le=50),
-    kind: Optional[str] = Query(None, pattern="^(uncovered_concept|weak_hypothesis|low_confidence|open_contradiction)$"),
+    kind: str | None = Query(None, pattern="^(uncovered_concept|weak_hypothesis|low_confidence|open_contradiction)$"),
 ):
     """Current knowledge gaps the agent has identified about itself."""
     from app.modules.curiosity import current_gaps
@@ -288,6 +313,7 @@ def curiosity_gaps_endpoint(
 def curiosity_recompute():
     """Force-recompute the gap snapshot now."""
     import threading
+
     from app.modules.curiosity import compute_gaps, seed_gap_questions
     s = get_settings()
     def _run():
@@ -543,7 +569,7 @@ def _hash_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return h.hexdigest()
 
 
-def _find_duplicate(content_hash: str) -> Optional[Document]:
+def _find_duplicate(content_hash: str) -> Document | None:
     """Return an existing Document with this content_hash, if any."""
     if not content_hash:
         return None
@@ -570,6 +596,7 @@ def _enqueue_ingest(file_path: str, doc_id: str, job_id: str) -> bool:
     # The pool (default 2 workers) processes one PDF at a time per worker,
     # preventing SQLite write storms and NVIDIA rate-limit exhaustion.
     import queue as _queue_mod
+
     from app.workers.inproc_queue import submit_ingest
     try:
         submit_ingest(file_path, doc_id, job_id)
@@ -866,7 +893,7 @@ def document_chunks(
     doc_id: str,
     offset: int = 0,
     limit: int = Query(50, le=200),
-    kind: Optional[str] = None,
+    kind: str | None = None,
     s: Session = Depends(_db),
 ):
     if not s.get(Document, doc_id):
@@ -903,9 +930,9 @@ def document_questions(doc_id: str, s: Session = Depends(_db)):
 # ------------- Questions -------------
 @router.get("/questions", response_model=list[QuestionOut])
 def list_questions(
-    status: Optional[str] = None,
-    document_id: Optional[str] = None,
-    parent_id: Optional[str] = None,
+    status: str | None = None,
+    document_id: str | None = None,
+    parent_id: str | None = None,
     limit: int = Query(100, le=500),
     s: Session = Depends(_db),
 ):
@@ -950,10 +977,12 @@ def manually_solve(qid: str):
     """Solve a question and return the answer immediately. Reflection (which spawns
     follow-up questions and writes memory) runs in a background thread so the
     HTTP response returns fast and the UI doesn't stall the proxy."""
-    from app.modules.solver.engine import solve_question
-    from app.modules.learner.engine import reflect_and_expand
     import threading
+
     from loguru import logger
+
+    from app.modules.learner.engine import reflect_and_expand
+    from app.modules.solver.engine import solve_question
 
     res = solve_question(qid)
 
@@ -978,7 +1007,7 @@ def list_insights(limit: int = 100, s: Session = Depends(_db)):
 
 
 @router.get("/memory", response_model=list[MemoryOut])
-def list_memory(layer: Optional[str] = None, limit: int = 200, s: Session = Depends(_db)):
+def list_memory(layer: str | None = None, limit: int = 200, s: Session = Depends(_db)):
     try:
         q = select(Memory)
         if layer:
@@ -1107,8 +1136,9 @@ def list_jobs(limit: int = 50, s: Session = Depends(_db)):
 @router.get("/jobs/stats")
 def jobs_stats(s: Session = Depends(_db)):
     """Queue depth + recent job status counts."""
-    from app.workers.inproc_queue import queue_stats
     from sqlalchemy import func
+
+    from app.workers.inproc_queue import queue_stats
 
     rows = s.execute(
         select(Job.status, func.count().label("n"))
@@ -1187,3 +1217,61 @@ def feed_recent(limit: int = 50):
     except Exception as e:
         logger.warning("Feed unavailable: {}", e)
         return []
+
+
+# ─── Chat ("Ask EvoMind") ──────────────────────────────────────────────────
+# A user-driven conversational surface over the corpus. Reuses the solver's
+# hybrid retrieval + grounded answering (app.modules.chat) rather than
+# reimplementing it.
+
+@router.post("/chat", response_model=ChatReply)
+def chat(req: ChatRequest):
+    from app.modules.chat import answer_chat
+
+    message = (req.message or "").strip()
+    if not message:
+        raise HTTPException(400, "message must not be empty")
+    try:
+        return answer_chat(message, req.conversation_id)
+    except ValueError as e:
+        # Unknown conversation_id, empty message, etc.
+        raise HTTPException(404, str(e)) from e
+
+
+@router.get("/chat/conversations", response_model=list[ConversationOut])
+def list_conversations(limit: int = 50, s: Session = Depends(_db)):
+    rows = (
+        s.execute(
+            select(Conversation).order_by(desc(Conversation.updated_at)).limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    return rows
+
+
+@router.get("/chat/conversations/{conversation_id}", response_model=list[ChatMessageOut])
+def conversation_messages(conversation_id: str, s: Session = Depends(_db)):
+    conv = s.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(404, "conversation not found")
+    rows = (
+        s.execute(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(asc(ChatMessage.created_at))
+        )
+        .scalars()
+        .all()
+    )
+    return rows
+
+
+@router.delete("/chat/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, s: Session = Depends(_db)):
+    conv = s.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(404, "conversation not found")
+    s.delete(conv)
+    s.commit()
+    return {"ok": True}

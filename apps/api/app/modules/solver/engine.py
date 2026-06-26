@@ -5,11 +5,11 @@ from loguru import logger
 
 from app.core.config import get_settings
 from app.db import postgres, redis_client
-from app.db.models import Question, Answer, Memory
+from app.db.models import Answer, Question
 from app.llm import router as llm
-from app.llm.router import purpose
 from app.llm.prompts import SOLVER_SYSTEM, SOLVER_USER
-from app.modules.retrieval.hybrid import hybrid_search, Hit
+from app.llm.router import purpose
+from app.modules.retrieval.hybrid import Hit, hybrid_search
 
 
 def _format_evidence(hits: list[Hit]) -> tuple[str, list[dict]]:

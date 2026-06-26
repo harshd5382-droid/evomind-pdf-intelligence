@@ -2,12 +2,12 @@ from datetime import datetime
 
 from loguru import logger
 
-from app.workers.celery_app import celery
 from app.db import postgres
 from app.db.models import Job
 from app.ingestion.pipeline import ingest_pdf
-from app.modules.orchestrator import run_cycle, run_daily_research
 from app.modules.intelligence.scorer import compute_score
+from app.modules.orchestrator import run_cycle, run_daily_research
+from app.workers.celery_app import celery
 
 
 def _start_job(job_id: str) -> None:

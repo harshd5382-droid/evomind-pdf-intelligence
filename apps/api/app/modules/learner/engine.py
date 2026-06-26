@@ -5,10 +5,10 @@ from loguru import logger
 
 from app.core.config import get_settings
 from app.db import postgres, redis_client
-from app.db.models import Question, Memory
+from app.db.models import Memory, Question
 from app.llm import router as llm
-from app.llm.router import purpose
 from app.llm.prompts import LEARNER_SYSTEM, LEARNER_USER
+from app.llm.router import purpose
 from app.modules.questioner.engine import VALID_CATEGORIES
 
 
