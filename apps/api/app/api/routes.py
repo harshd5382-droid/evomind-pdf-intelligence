@@ -1,29 +1,57 @@
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
-import os
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from loguru import logger
-from sqlalchemy import select, desc, asc, func
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session
 
+from app.api.schemas import (
+    AnalyzeRequest,
+    AnswerOut,
+    ChatMessageOut,
+    ChatReply,
+    ChatRequest,
+    ConfigUpdate,
+    ConversationOut,
+    CycleRequest,
+    DocumentOut,
+    EvalRequest,
+    FeedbackRequest,
+    HypothesisOut,
+    InsightOut,
+    JobOut,
+    MemoryOut,
+    QuestionOut,
+)
+from app.core.cache import ttl_cache
 from app.core.config import get_settings
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
-from app.db import postgres, redis_client, neo4j_store, qdrant
+from app.core.ratelimit import limiter
+from app.core.security import require_api_key
+from app.db import neo4j_store, postgres, qdrant, redis_client
 from app.db.models import (
-    Document, Chunk, Question, Answer, Insight, Memory, Hypothesis, Job, Contradiction, Usage,
-)
-from app.api.schemas import (
-    DocumentOut, QuestionOut, AnswerOut, InsightOut, MemoryOut, HypothesisOut, JobOut,
-    CycleRequest, AnalyzeRequest,
+    Answer,
+    ChatMessage,
+    Chunk,
+    Contradiction,
+    Conversation,
+    Document,
+    Feedback,
+    Hypothesis,
+    Insight,
+    Job,
+    Memory,
+    Question,
+    Usage,
 )
 from app.modules.intelligence.scorer import compute_score, score_history
 from app.modules.questioner.engine import generate_for_document
@@ -51,7 +79,7 @@ def _db():
     yield from postgres.get_session()
 
 
-def _event_time_ms(event: dict, fallback_ms: Optional[int] = None) -> int:
+def _event_time_ms(event: dict, fallback_ms: int | None = None) -> int:
     for key in ("_t", "timestamp_ms", "timestamp", "ts", "created_at"):
         value = event.get(key)
         if value is None:
@@ -81,7 +109,7 @@ def _event_id(event: dict) -> str:
     return f"{event.get('type', 'event')}:{digest}"
 
 
-def _normalize_event(event: dict, *, fallback_ms: Optional[int] = None) -> dict:
+def _normalize_event(event: dict, *, fallback_ms: int | None = None) -> dict:
     ev = dict(event or {})
     ev["_t"] = _event_time_ms(ev, fallback_ms=fallback_ms)
     ev["_event_id"] = _event_id(ev)
@@ -100,7 +128,7 @@ def health():
         "providers": diag["providers"],
         "issues": diag["issues"],
     }
-    
+
 @router.get("/healthz")
 def healthz():
     db = postgres.status()
@@ -121,7 +149,7 @@ def healthz():
         and qdrant_store["reachable"]
         and neo4j["reachable"]
     )
-    
+
     return JSONResponse(
         status_code=(
             status.HTTP_200_OK
@@ -130,8 +158,8 @@ def healthz():
     ),
     content=response,
 )
-    
-    
+
+
 
 
 @router.get("/diagnostics")
@@ -144,12 +172,12 @@ def integrity():
     return integrity_report(repair=False)
 
 
-@router.post("/integrity/repair")
+@router.post("/integrity/repair", dependencies=[Depends(require_api_key)])
 def integrity_repair():
     return integrity_report(repair=True)
 
 
-@router.post("/admin/reset-vector-store")
+@router.post("/admin/reset-vector-store", dependencies=[Depends(require_api_key)])
 def reset_vector_store():
     """Drop & recreate the Qdrant collection at the current embedding provider's dim.
 
@@ -175,6 +203,20 @@ def public_config():
     }
 
 
+@router.post("/config", dependencies=[Depends(require_api_key)])
+def update_config(req: ConfigUpdate):
+    """Apply runtime overrides for the tuning knobs. Takes effect immediately
+    for the autopilot (it reads settings live) but is NOT persisted across a
+    restart — set the corresponding env var in .env to make it permanent."""
+    s = get_settings()
+    changed = req.model_dump(exclude_none=True)
+    for field, val in changed.items():
+        setattr(s, field, val)
+    if changed:
+        logger.info("Runtime config updated: {}", changed)
+    return {"ok": True, "changed": changed, "config": public_config()}
+
+
 @router.get("/autopilot/status")
 def autopilot_status():
     """Live status of the autonomous research loop."""
@@ -188,6 +230,7 @@ def autopilot_run_now():
     bypassing the interval gate. Useful for impatient debugging — the loop
     runs every phase by itself anyway."""
     import threading
+
     from app.modules import autopilot
 
     def _all_phases():
@@ -217,6 +260,7 @@ def folder_watcher_status():
 def folder_watcher_scan_now():
     """Force an immediate scan of the auto-ingest folder."""
     from pathlib import Path
+
     from app.modules import folder_watcher
     s = get_settings()
     folder = Path(s.auto_ingest_dir).expanduser()
@@ -235,10 +279,11 @@ def get_identity():
     return current_identity()
 
 
-@router.post("/identity/refresh")
+@router.post("/identity/refresh", dependencies=[Depends(require_api_key)])
 def refresh_identity():
     """Force an immediate identity recompile. Returns the new state."""
     import threading
+
     from app.modules.identity import update_identity
     # Run on a background thread — narrative LLM call can take a few seconds
     # and we don't want to block the request.
@@ -259,10 +304,11 @@ def journal_recent(limit: int = Query(20, ge=1, le=100)):
     return {"items": recent_entries(limit=limit)}
 
 
-@router.post("/journal/write-now")
+@router.post("/journal/write-now", dependencies=[Depends(require_api_key)])
 def journal_write_now():
     """Force the agent to write a journal entry immediately."""
     import threading
+
     from app.modules.journal import write_entry
     def _run():
         try:
@@ -277,17 +323,18 @@ def journal_write_now():
 @router.get("/curiosity/gaps")
 def curiosity_gaps_endpoint(
     limit: int = Query(12, ge=1, le=50),
-    kind: Optional[str] = Query(None, pattern="^(uncovered_concept|weak_hypothesis|low_confidence|open_contradiction)$"),
+    kind: str | None = Query(None, pattern="^(uncovered_concept|weak_hypothesis|low_confidence|open_contradiction)$"),
 ):
     """Current knowledge gaps the agent has identified about itself."""
     from app.modules.curiosity import current_gaps
     return {"items": current_gaps(limit=limit, kind=kind)}
 
 
-@router.post("/curiosity/recompute")
+@router.post("/curiosity/recompute", dependencies=[Depends(require_api_key)])
 def curiosity_recompute():
     """Force-recompute the gap snapshot now."""
     import threading
+
     from app.modules.curiosity import compute_gaps, seed_gap_questions
     s = get_settings()
     def _run():
@@ -543,7 +590,7 @@ def _hash_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return h.hexdigest()
 
 
-def _find_duplicate(content_hash: str) -> Optional[Document]:
+def _find_duplicate(content_hash: str) -> Document | None:
     """Return an existing Document with this content_hash, if any."""
     if not content_hash:
         return None
@@ -570,6 +617,7 @@ def _enqueue_ingest(file_path: str, doc_id: str, job_id: str) -> bool:
     # The pool (default 2 workers) processes one PDF at a time per worker,
     # preventing SQLite write storms and NVIDIA rate-limit exhaustion.
     import queue as _queue_mod
+
     from app.workers.inproc_queue import submit_ingest
     try:
         submit_ingest(file_path, doc_id, job_id)
@@ -579,22 +627,52 @@ def _enqueue_ingest(file_path: str, doc_id: str, job_id: str) -> bool:
     return False
 
 
-@router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    s = get_settings()
-    Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
+def _validate_pdf_filename(file: UploadFile) -> None:
+    """Reject anything that isn't a PDF by extension or declared content type."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only .pdf files are accepted")
+    ctype = (file.content_type or "").lower()
+    if ctype and ctype not in ("application/pdf", "application/octet-stream"):
+        raise HTTPException(400, f"Unexpected content type for a PDF: {ctype}")
 
-    doc_id = str(uuid.uuid4())
-    safe_name = f"{doc_id}_{Path(file.filename).name}"
-    target = Path(s.upload_dir) / safe_name
+
+async def _save_upload(file: UploadFile, target: Path, max_bytes: int) -> None:
+    """Stream an upload to disk, enforcing a size cap and a %PDF magic check.
+
+    Aborts and removes the partial file if the cap is exceeded or the content
+    isn't actually a PDF (defends against a non-PDF renamed to .pdf)."""
+    written = 0
+    first = b""
     with target.open("wb") as f:
         while True:
             chunk = await file.read(1024 * 1024)
             if not chunk:
                 break
+            if not first:
+                first = chunk[:5]
+            written += len(chunk)
+            if written > max_bytes:
+                f.close()
+                target.unlink(missing_ok=True)
+                raise HTTPException(413, f"File exceeds the {max_bytes // (1024 * 1024)} MB limit")
             f.write(chunk)
+    if not first.startswith(b"%PDF"):
+        target.unlink(missing_ok=True)
+        raise HTTPException(400, "File does not look like a valid PDF (missing %PDF header)")
+
+
+@router.post("/upload", dependencies=[Depends(require_api_key)])
+@limiter.limit(get_settings().rate_limit_upload)
+async def upload_pdf(request: Request, file: UploadFile = File(...)):
+    s = get_settings()
+    Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
+    _validate_pdf_filename(file)
+    filename = file.filename or ""  # guaranteed non-empty by the validation above
+
+    doc_id = str(uuid.uuid4())
+    safe_name = f"{doc_id}_{Path(filename).name}"
+    target = Path(s.upload_dir) / safe_name
+    await _save_upload(file, target, s.max_upload_mb * 1024 * 1024)
 
     # Dedup: hash the file we just wrote and look for an existing document
     # with identical content. If found, delete the duplicate copy from disk
@@ -627,7 +705,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         # Pre-register the document with its hash so concurrent uploads of the
         # same file don't slip past the dedup check before ingest finishes.
         session.add(Document(
-            id=doc_id, title=Path(file.filename).stem, filename=file.filename,
+            id=doc_id, title=Path(filename).stem, filename=filename,
             path=str(target), content_hash=content_hash, status="pending",
         ))
 
@@ -635,7 +713,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     return {"document_id": doc_id, "job_id": job_id, "queued": queued, "duplicate": False}
 
 
-@router.post("/upload/batch")
+@router.post("/upload/batch", dependencies=[Depends(require_api_key)])
 async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     """Multi-file upload — used by the browser folder picker (webkitdirectory).
 
@@ -716,7 +794,7 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     }
 
 
-@router.post("/upload/folder")
+@router.post("/upload/folder", dependencies=[Depends(require_api_key)])
 def ingest_folder(payload: dict):
     """Ingest every PDF found under a server-side folder path.
 
@@ -727,6 +805,10 @@ def ingest_folder(payload: dict):
     recursive = bool((payload or {}).get("recursive", True))
     if not raw_path:
         raise HTTPException(400, "Missing 'path'")
+    # Reject path-traversal segments before resolving, so a caller can't walk
+    # up out of an intended directory via "..".
+    if ".." in Path(raw_path).parts:
+        raise HTTPException(400, "Path traversal ('..') is not allowed")
 
     folder = Path(raw_path).expanduser()
     if not folder.exists() or not folder.is_dir():
@@ -851,7 +933,7 @@ def get_document(doc_id: str, s: Session = Depends(_db)):
     return d
 
 
-@router.delete("/documents/{doc_id}")
+@router.delete("/documents/{doc_id}", dependencies=[Depends(require_api_key)])
 def delete_document(doc_id: str, s: Session = Depends(_db)):
     d = s.get(Document, doc_id)
     if not d:
@@ -866,7 +948,7 @@ def document_chunks(
     doc_id: str,
     offset: int = 0,
     limit: int = Query(50, le=200),
-    kind: Optional[str] = None,
+    kind: str | None = None,
     s: Session = Depends(_db),
 ):
     if not s.get(Document, doc_id):
@@ -903,9 +985,9 @@ def document_questions(doc_id: str, s: Session = Depends(_db)):
 # ------------- Questions -------------
 @router.get("/questions", response_model=list[QuestionOut])
 def list_questions(
-    status: Optional[str] = None,
-    document_id: Optional[str] = None,
-    parent_id: Optional[str] = None,
+    status: str | None = None,
+    document_id: str | None = None,
+    parent_id: str | None = None,
     limit: int = Query(100, le=500),
     s: Session = Depends(_db),
 ):
@@ -929,20 +1011,40 @@ def question_answers(qid: str, s: Session = Depends(_db)):
 
 @router.get("/questions/{qid}/tree")
 def question_tree(qid: str, s: Session = Depends(_db)):
-    """Recursive tree from a root question (depth limited)."""
-
-    def build(q: Question) -> dict:
-        children = s.execute(select(Question).where(Question.parent_id == q.id)).scalars().all()
-        return {
-            "id": q.id, "text": q.text, "category": q.category,
-            "status": q.status, "priority": q.priority, "depth": q.depth,
-            "children": [build(c) for c in children],
-        }
-
+    """Tree from a root question. Loads level-by-level (one query per depth via
+    parent_id IN (...)) instead of one query per node, avoiding the N+1 the
+    naive recursion caused."""
     root = s.get(Question, qid)
     if not root:
         raise HTTPException(404, "question not found")
-    return build(root)
+
+    def node(q: Question) -> dict:
+        return {
+            "id": q.id, "text": q.text, "category": q.category,
+            "status": q.status, "priority": q.priority, "depth": q.depth,
+            "children": [],
+        }
+
+    nodes = {root.id: node(root)}
+    frontier = [root.id]
+    seen = {root.id}
+    while frontier:
+        children = s.execute(
+            select(Question).where(Question.parent_id.in_(frontier))
+        ).scalars().all()
+        next_frontier: list[str] = []
+        for c in children:
+            if c.id in seen:  # guard against cycles
+                continue
+            seen.add(c.id)
+            cd = node(c)
+            nodes[c.id] = cd
+            parent = nodes.get(c.parent_id) if c.parent_id else None
+            if parent is not None:
+                parent["children"].append(cd)
+            next_frontier.append(c.id)
+        frontier = next_frontier
+    return nodes[root.id]
 
 
 @router.post("/questions/{qid}/solve")
@@ -950,10 +1052,12 @@ def manually_solve(qid: str):
     """Solve a question and return the answer immediately. Reflection (which spawns
     follow-up questions and writes memory) runs in a background thread so the
     HTTP response returns fast and the UI doesn't stall the proxy."""
-    from app.modules.solver.engine import solve_question
-    from app.modules.learner.engine import reflect_and_expand
     import threading
+
     from loguru import logger
+
+    from app.modules.learner.engine import reflect_and_expand
+    from app.modules.solver.engine import solve_question
 
     res = solve_question(qid)
 
@@ -978,7 +1082,7 @@ def list_insights(limit: int = 100, s: Session = Depends(_db)):
 
 
 @router.get("/memory", response_model=list[MemoryOut])
-def list_memory(layer: Optional[str] = None, limit: int = 200, s: Session = Depends(_db)):
+def list_memory(layer: str | None = None, limit: int = 200, s: Session = Depends(_db)):
     try:
         q = select(Memory)
         if layer:
@@ -1044,12 +1148,17 @@ def report_markdown(insight_id: str, s: Session = Depends(_db)):
 
 
 # ------------- Metrics / Intelligence Score -------------
+@ttl_cache(5.0)
+def _metrics_payload() -> dict:
+    # Cached briefly: the dashboard polls this every few seconds and
+    # compute_score() scans several tables (and writes a snapshot row).
+    return {"current": compute_score(), "history": score_history(days=14)}
+
+
 @router.get("/metrics")
 def metrics():
     try:
-        snap = compute_score()
-        history = score_history(days=14)
-        return {"current": snap, "history": history}
+        return _metrics_payload()
     except Exception as e:
         logger.warning("Metrics unavailable: {}", e)
         return {"current": _empty_metrics_snapshot(), "history": []}
@@ -1107,8 +1216,9 @@ def list_jobs(limit: int = 50, s: Session = Depends(_db)):
 @router.get("/jobs/stats")
 def jobs_stats(s: Session = Depends(_db)):
     """Queue depth + recent job status counts."""
-    from app.workers.inproc_queue import queue_stats
     from sqlalchemy import func
+
+    from app.workers.inproc_queue import queue_stats
 
     rows = s.execute(
         select(Job.status, func.count().label("n"))
@@ -1187,3 +1297,141 @@ def feed_recent(limit: int = 50):
     except Exception as e:
         logger.warning("Feed unavailable: {}", e)
         return []
+
+
+# ─── Chat ("Ask EvoMind") ──────────────────────────────────────────────────
+# A user-driven conversational surface over the corpus. Reuses the solver's
+# hybrid retrieval + grounded answering (app.modules.chat) rather than
+# reimplementing it.
+
+@router.post("/chat", response_model=ChatReply, dependencies=[Depends(require_api_key)])
+@limiter.limit(get_settings().rate_limit_chat)
+def chat(request: Request, req: ChatRequest):
+    from app.modules.chat import answer_chat
+
+    message = (req.message or "").strip()
+    if not message:
+        raise HTTPException(400, "message must not be empty")
+    try:
+        return answer_chat(message, req.conversation_id)
+    except ValueError as e:
+        # Unknown conversation_id, empty message, etc.
+        raise HTTPException(404, str(e)) from e
+
+
+@router.get("/chat/conversations", response_model=list[ConversationOut])
+def list_conversations(limit: int = 50, s: Session = Depends(_db)):
+    rows = (
+        s.execute(
+            select(Conversation).order_by(desc(Conversation.updated_at)).limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    return rows
+
+
+@router.get("/chat/conversations/{conversation_id}", response_model=list[ChatMessageOut])
+def conversation_messages(conversation_id: str, s: Session = Depends(_db)):
+    conv = s.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(404, "conversation not found")
+    rows = (
+        s.execute(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(asc(ChatMessage.created_at))
+        )
+        .scalars()
+        .all()
+    )
+    return rows
+
+
+@router.delete("/chat/conversations/{conversation_id}", dependencies=[Depends(require_api_key)])
+def delete_conversation(conversation_id: str, s: Session = Depends(_db)):
+    conv = s.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(404, "conversation not found")
+    s.delete(conv)
+    s.commit()
+    return {"ok": True}
+
+
+# ─── Backup / restore ──────────────────────────────────────────────────────
+# Postgres/SQLite is the source of truth; Qdrant + Neo4j are derivable and
+# captured best-effort. See app/modules/backup.
+
+@router.post("/backup/now", dependencies=[Depends(require_api_key)])
+def backup_now():
+    from app.modules.backup import create_backup
+    return create_backup()
+
+
+@router.get("/backup/status")
+def backup_status_route():
+    from app.modules.backup import backup_status
+    return backup_status()
+
+
+@router.get("/backup/list")
+def backup_list_route():
+    from app.modules.backup import list_backups
+    return list_backups()
+
+
+@router.get("/backup/{backup_id}/download", dependencies=[Depends(require_api_key)])
+def backup_download(backup_id: str):
+    import shutil
+
+    from app.modules.backup import backup_dir_path
+
+    # Reject anything that isn't a plain backup id (defends against traversal).
+    if "/" in backup_id or "\\" in backup_id or ".." in backup_id:
+        raise HTTPException(400, "invalid backup id")
+    folder = backup_dir_path() / backup_id
+    if not folder.is_dir():
+        raise HTTPException(404, "backup not found")
+
+    archive_base = backup_dir_path() / f"{backup_id}"
+    zip_path = shutil.make_archive(str(archive_base), "zip", root_dir=str(folder))
+    return FileResponse(zip_path, media_type="application/zip", filename=f"evomind-backup-{backup_id}.zip")
+
+
+# ─── Evaluation & feedback ─────────────────────────────────────────────────
+# Answer-quality eval (LLM judge over cited answers) + human thumbs feedback.
+
+@router.post("/eval/run", dependencies=[Depends(require_api_key)])
+def eval_run(req: EvalRequest | None = None):
+    from app.modules.eval import run_eval
+    return run_eval(sample_size=(req.sample_size if req else 20))
+
+
+@router.get("/eval/history")
+def eval_history_route(days: int = 30):
+    from app.modules.eval import eval_history
+    return eval_history(days=days)
+
+
+@router.post("/feedback")
+def submit_feedback(req: FeedbackRequest, s: Session = Depends(_db)):
+    fb = Feedback(
+        target_kind=req.target_kind, target_id=req.target_id,
+        rating=req.rating, note=req.note,
+    )
+    s.add(fb)
+    s.commit()
+    return {"ok": True, "id": fb.id}
+
+
+@router.get("/feedback/summary")
+def feedback_summary(s: Session = Depends(_db)):
+    up = s.query(func.count(Feedback.id)).filter(Feedback.rating > 0).scalar() or 0
+    down = s.query(func.count(Feedback.id)).filter(Feedback.rating < 0).scalar() or 0
+    total = up + down
+    return {
+        "up": int(up),
+        "down": int(down),
+        "total": int(total),
+        "approval_rate": round(up / total, 3) if total else 0.0,
+    }

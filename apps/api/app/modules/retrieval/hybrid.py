@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Optional
 
 from loguru import logger
 from sqlalchemy import select
@@ -21,7 +19,6 @@ from sqlalchemy import select
 from app.db import postgres, qdrant
 from app.db.models import Chunk, Document
 from app.llm import router as llm
-
 
 _TOK_RE = re.compile(r"[A-Za-z0-9]+")
 _STOP = set(
@@ -41,7 +38,7 @@ class Hit:
     document_id: str
     page: int
     title: str
-    section: Optional[str]
+    section: str | None
     kind: str
     text: str
     vector_score: float = 0.0
@@ -50,7 +47,7 @@ class Hit:
     fused_score: float = 0.0
 
 
-def _load_chunks(document_id: Optional[str]) -> list[tuple[Chunk, str]]:
+def _load_chunks(document_id: str | None) -> list[tuple[Chunk, str]]:
     """Return [(chunk, doc_title)] in deterministic order."""
     with postgres.session_scope() as s:
         stmt = select(Chunk, Document.title).join(Document, Document.id == Chunk.document_id)
@@ -75,7 +72,7 @@ def hybrid_search(
     query: str,
     *,
     top_k: int = 8,
-    document_id: Optional[str] = None,
+    document_id: str | None = None,
     rrf_k: int = 60,
 ) -> list[Hit]:
     """Return top_k chunks fused from vector + BM25.
@@ -131,9 +128,10 @@ def hybrid_search(
         if cid in fused:
             fused[cid].bm25_rank = rank
             continue
-        ch, _ = chunk_index.get(cid, (None, None))
-        if ch is None:
+        entry = chunk_index.get(cid)
+        if entry is None:
             continue
+        ch, _ = entry
         fused[cid] = Hit(
             chunk_id=cid,
             document_id=doc_id,

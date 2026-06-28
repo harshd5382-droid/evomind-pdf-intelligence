@@ -108,7 +108,7 @@ def _graph_from_sql(limit: int = 200) -> dict:
       - Hypothesis -[FROM]-> Insight      (chronological proximity heuristic)
     """
     from app.db import postgres
-    from app.db.models import Document, Memory, Hypothesis, Insight, Contradiction, Chunk
+    from app.db.models import Chunk, Contradiction, Document, Hypothesis, Insight
 
     nodes: list[dict] = []
     links: list[dict] = []
@@ -168,7 +168,7 @@ def _graph_from_sql(limit: int = 200) -> dict:
     # Trim to limit and drop edges whose endpoints didn't make the cut
     nodes = nodes[:limit]
     keep = {n["id"] for n in nodes}
-    links = [l for l in links if l["source"] in keep and l["target"] in keep]
+    links = [lk for lk in links if lk["source"] in keep and lk["target"] in keep]
     return {"nodes": nodes, "links": links, "source": "sql"}
 
 

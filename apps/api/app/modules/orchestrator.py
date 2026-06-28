@@ -9,19 +9,20 @@ import math
 from itertools import combinations
 
 from loguru import logger
-from sqlalchemy import select, func, asc, desc
+from sqlalchemy import asc, func, select
 
-from app.core.config import get_settings
 from app.db import postgres, redis_client
-from app.db.models import Document, Question, Answer, Memory
+from app.db.models import Answer, Document, Memory, Question
 from app.llm import router as llm
+from app.modules.intelligence.scorer import compute_score
+from app.modules.knowledge.synthesis import (
+    detect_pairwise_contradiction,
+    generate_hypotheses_from_top_insights,
+    synthesize_topic,
+)
+from app.modules.learner.engine import reflect_and_expand
 from app.modules.questioner.engine import generate_for_document
 from app.modules.solver.engine import solve_question
-from app.modules.learner.engine import reflect_and_expand
-from app.modules.knowledge.synthesis import (
-    synthesize_topic, generate_hypotheses_from_top_insights, detect_pairwise_contradiction,
-)
-from app.modules.intelligence.scorer import compute_score
 
 
 def _seed_questions_for_unseeded_docs() -> int:
@@ -114,7 +115,6 @@ def _scan_for_contradictions(answer_ids: list[str], max_pairs: int = 6) -> int:
 
 
 def run_cycle(question_budget: int = 8, synthesize_top_keywords: bool = True) -> dict:
-    settings = get_settings()
     redis_client.publish_event({"type": "cycle.started", "budget": question_budget})
 
     seeded = _seed_questions_for_unseeded_docs()

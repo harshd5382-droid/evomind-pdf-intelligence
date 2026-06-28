@@ -7,7 +7,6 @@ chosen model. Tuned for an 8 GB RAM machine running Qwen 2.5 7B by default.
 from __future__ import annotations
 
 import httpx
-from loguru import logger
 
 from app.core.config import get_settings
 from app.llm.base import LLMProvider, LLMResult

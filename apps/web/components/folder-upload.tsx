@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { apiUrl } from "@/lib/api";
@@ -18,6 +18,15 @@ export function FolderUpload({ onClose, onDone }: { onClose: () => void; onDone:
   const folderRef = useRef<HTMLInputElement>(null);
   const [serverPath, setServerPath] = useState("");
   const [recursive, setRecursive] = useState(true);
+
+  // Close on Escape (a11y: dialogs should be dismissable from the keyboard).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   async function uploadFolder(files: FileList) {
     setBusy(true); setOutcome(null);
@@ -64,17 +73,26 @@ export function FolderUpload({ onClose, onDone }: { onClose: () => void; onDone:
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="folder-upload-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Card className="!p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2">
+              <h2 id="folder-upload-title" className="text-xl font-semibold flex items-center gap-2">
                 <FolderUp className="w-5 h-5 text-accent" /> Ingest a folder of PDFs
               </h2>
               <p className="text-sub text-sm mt-1">Pick a folder or point at a server path. All PDFs found are queued for ingestion.</p>
             </div>
-            <button onClick={onClose} className="text-sub hover:text-ink p-1 -mr-2"><X className="w-5 h-5" /></button>
+            <button onClick={onClose} aria-label="Close dialog" className="text-sub hover:text-ink p-1 -mr-2"><X className="w-5 h-5" /></button>
           </div>
 
           <div className="flex gap-1 mb-4 border-b border-border">

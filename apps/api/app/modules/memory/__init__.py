@@ -11,9 +11,9 @@ identity over time.
 """
 from app.modules.memory.store import (
     add_memory,
-    search_memories,
     backfill_embeddings,
     memory_stats,
+    search_memories,
 )
 
 __all__ = ["add_memory", "search_memories", "backfill_embeddings", "memory_stats"]

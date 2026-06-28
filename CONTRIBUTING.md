@@ -118,6 +118,29 @@ These are load-bearing — please don't bypass them without discussion:
 
 ---
 
+## Backup & restore
+
+The API can snapshot durable state on demand:
+
+- `POST /api/backup/now` — create a backup (auth-gated). Writes to
+  `<DATA_DIR>/backups/<id>/`.
+- `GET /api/backup/status` / `GET /api/backup/list` — inspect backups.
+- `GET /api/backup/{id}/download` — download a backup as a zip (auth-gated).
+
+A daily backup also runs via Celery beat (`daily_backup_task`, 03:30 UTC).
+
+**What's captured:** PostgreSQL (via `pg_dump`) or SQLite (online `.backup()`)
+— the source of truth. Qdrant vectors and the Neo4j graph are *derivable* from
+the relational data, so they're best-effort (Qdrant gets a server-side snapshot
+when reachable) and noted in the manifest.
+
+**Restoring:**
+- SQLite: stop the API and replace the DB file with `database.sqlite` from the
+  backup folder.
+- Postgres: `psql "<dsn>" -f database.sql` into a clean database.
+- Rebuild vectors/graph by letting the autopilot re-ingest/re-synthesise, or
+  restore the Qdrant snapshot via the Qdrant API.
+
 ## Reporting security issues
 
 Please do **not** open public issues for security vulnerabilities. Follow [SECURITY.md](SECURITY.md).

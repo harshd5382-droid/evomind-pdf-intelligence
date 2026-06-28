@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Search candidates for the .env file: cwd, the api package root, the monorepo root.
 # Note: depth differs between a checkout (.../apps/api/app/core/config.py) and the
@@ -25,6 +25,34 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "INFO"
+    # Emit logs as JSON (one object per line) — useful behind Loki/ELK in prod.
+    log_json: bool = False
+    # Expose a Prometheus /metrics endpoint and record LLM/HTTP metrics.
+    metrics_enabled: bool = True
+
+    # ─── Security ───────────────────────────────────────────────────────
+    # Off by default so local/dev and the test suite are unaffected. When
+    # enabled, mutating + admin endpoints require a Bearer token (or X-API-Key
+    # header) present in `api_keys` (comma-separated).
+    auth_enabled: bool = False
+    api_keys: str = ""
+    # CORS: comma-separated allowed origins. "*" allows any (dev convenience).
+    cors_origins: str = "*"
+    # Uploads: reject files larger than this (defence against disk-fill).
+    max_upload_mb: int = 50
+    # Rate limiting (slowapi). Generous defaults; disable for load tests.
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "240/minute"
+    rate_limit_chat: str = "60/minute"
+    rate_limit_upload: str = "60/minute"
+
+    @property
+    def api_key_set(self) -> set[str]:
+        return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()] or ["*"]
 
     # Storage
     data_dir: str = "./data"
@@ -47,7 +75,7 @@ class Settings(BaseSettings):
     neo4j_password: str = "evomind123"
 
     # LLM Providers — set whichever you intend to use
-    primary_provider: str = "nvidia"  # nvidia | anthropic | openai | gemini | ollama 
+    primary_provider: str = "nvidia"  # nvidia | anthropic | openai | gemini | ollama
     embedding_provider: str = "nvidia"  # nvidia | local | openai
 
     anthropic_api_key: str | None = None
@@ -58,7 +86,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
-    
+
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-1.5-pro"
 

@@ -22,15 +22,13 @@ import json
 import re
 import threading
 import time
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from functools import lru_cache
-from typing import Optional
 
 from loguru import logger
 
 from app.core.config import get_settings
-from app.llm.base import LLMProvider, EmbeddingProvider, LLMResult
-
+from app.llm.base import EmbeddingProvider, LLMProvider, LLMResult
 
 # ---------------------------------------------------------------------------
 # Purpose attribution
@@ -44,9 +42,9 @@ class purpose:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self._token = None
+        self._token: Token[str] | None = None
 
-    def __enter__(self) -> "purpose":
+    def __enter__(self) -> purpose:
         self._token = _purpose_var.set(self.name)
         return self
 
@@ -245,6 +243,11 @@ def _record_usage(res: LLMResult, latency_ms: int, provider_name: str) -> None:
         u = res.usage or {}
         in_tok = int(u.get("input") or u.get("input_tokens") or u.get("prompt_tokens") or 0)
         out_tok = int(u.get("output") or u.get("output_tokens") or u.get("completion_tokens") or 0)
+        try:
+            from app.core.metrics import record_llm
+            record_llm(provider_name, _purpose_var.get(), latency_ms, in_tok, out_tok)
+        except Exception:
+            pass
         with postgres.session_scope() as s:
             s.add(Usage(
                 provider=provider_name,

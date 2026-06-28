@@ -23,11 +23,11 @@ import time
 from itertools import combinations
 
 from loguru import logger
-from sqlalchemy import select, func, asc
+from sqlalchemy import asc, func, select
 
 from app.core.config import get_settings
 from app.db import postgres, redis_client
-from app.db.models import Document, Question, Answer
+from app.db.models import Answer, Document, Question
 from app.llm import router as llm
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -97,8 +97,8 @@ def _phase_seed_questions() -> int:
 
 def _phase_solve_batch(batch: int) -> list[str]:
     """Solve the top-priority open questions and reflect on each (spawning follow-ups)."""
-    from app.modules.solver.engine import solve_question
     from app.modules.learner.engine import reflect_and_expand
+    from app.modules.solver.engine import solve_question
 
     with postgres.session_scope() as s:
         qids = [

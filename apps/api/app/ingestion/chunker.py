@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 _HEADING_RE = re.compile(r"^(?:[A-Z][A-Z0-9 \-]{3,}|\d+(?:\.\d+)*\s+[A-Z].{0,80})$")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
 

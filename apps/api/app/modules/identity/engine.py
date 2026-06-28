@@ -20,15 +20,20 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import select, func, desc
 
 from app.db import postgres
 from app.db.models import (
-    Identity, Document, Question, Answer, Hypothesis, Insight, Contradiction, Memory,
+    Answer,
+    Contradiction,
+    Document,
+    Hypothesis,
+    Identity,
+    Insight,
+    Memory,
+    Question,
 )
 from app.llm import router as llm
 from app.llm.router import purpose
-
 
 _NARRATIVE_SYSTEM = (
     "You are the inner narrator of a research agent. Given the agent's current "
@@ -196,7 +201,7 @@ def _generate_narrative(state: dict[str, Any]) -> str:
 
 def update_identity() -> dict[str, Any]:
     """Recompile the self-model and persist it. Returns the new state."""
-    state = {
+    state: dict[str, Any] = {
         "beliefs":        _top_beliefs(),
         "open_questions": _top_open_questions(),
         "active_topics":  _top_active_topics(),

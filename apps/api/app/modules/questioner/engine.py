@@ -12,11 +12,10 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db import postgres, redis_client
-from app.db.models import Document, Chunk, Question
+from app.db.models import Chunk, Document, Question
 from app.llm import router as llm
-from app.llm.router import purpose
 from app.llm.prompts import QUESTION_GENERATOR_SYSTEM, QUESTION_GENERATOR_USER
-
+from app.llm.router import purpose
 
 VALID_CATEGORIES = {
     "understanding", "deep_logic", "missing_data", "contradiction",

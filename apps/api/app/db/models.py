@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import String, Text, Float, Integer, ForeignKey, DateTime, JSON, Boolean
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -21,21 +20,21 @@ class Document(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     title: Mapped[str] = mapped_column(String(512))
-    author: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    author: Mapped[str | None] = mapped_column(String(512), nullable=True)
     filename: Mapped[str] = mapped_column(String(512))
     path: Mapped[str] = mapped_column(String(1024))
     # SHA-256 of the original file bytes. Used to deduplicate uploads — re-uploading
     # the same PDF (same content, any filename) returns the existing document
     # instead of creating a duplicate. Indexed for O(log N) lookup per upload.
-    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     page_count: Mapped[int] = mapped_column(Integer, default=0)
-    subject_area: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    subject_area: Mapped[str | None] = mapped_column(String(128), nullable=True)
     importance: Mapped[float] = mapped_column(Float, default=0.0)
     keywords: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|parsing|ready|failed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    chunks: Mapped[list["Chunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+    chunks: Mapped[list[Chunk]] = relationship(back_populates="document", cascade="all, delete-orphan")
 
 
 class Chunk(Base):
@@ -46,7 +45,7 @@ class Chunk(Base):
     ord: Mapped[int] = mapped_column(Integer)
     page: Mapped[int] = mapped_column(Integer, default=0)
     text: Mapped[str] = mapped_column(Text)
-    section: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    section: Mapped[str | None] = mapped_column(String(256), nullable=True)
     kind: Mapped[str] = mapped_column(String(32), default="text")  # text|formula|table|claim|definition
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 
@@ -59,14 +58,14 @@ class Question(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     text: Mapped[str] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(48))  # understanding|deep_logic|missing_data|contradiction|math|application|research|meta|improvement
-    parent_id: Mapped[Optional[str]] = mapped_column(ForeignKey("questions.id"), nullable=True)
-    document_id: Mapped[Optional[str]] = mapped_column(ForeignKey("documents.id"), nullable=True)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("questions.id"), nullable=True)
+    document_id: Mapped[str | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
     depth: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(32), default="open")  # open|answered|unresolved
     priority: Mapped[float] = mapped_column(Float, default=0.5)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    answers: Mapped[list["Answer"]] = relationship(back_populates="question", cascade="all, delete-orphan")
+    answers: Mapped[list[Answer]] = relationship(back_populates="question", cascade="all, delete-orphan")
 
 
 class Answer(Base):
@@ -112,12 +111,12 @@ class Memory(Base):
     tags: Mapped[list] = mapped_column(JSON, default=list)
     importance: Mapped[float] = mapped_column(Float, default=0.5)
     # Where this memory came from. Lets us backref to the structured row.
-    source_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # insight|hypothesis|contradiction|reflection|digest|manual
-    source_id:   Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    source_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)  # insight|hypothesis|contradiction|reflection|digest|manual
+    source_id:   Mapped[str | None] = mapped_column(String(36), nullable=True)
     # Embedding of `content`. Populated on insert by the memory store; used
     # for cosine retrieval. JSON because we run the in-memory vector path
     # in zero-infra mode (no Qdrant). Brute-force search is fine to ≈10k items.
-    embedding:  Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    embedding:  Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -133,7 +132,7 @@ class Journal(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     body: Mapped[str] = mapped_column(Text)             # the paragraph
-    mood: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # e.g. curious|uncertain|excited
+    mood: Mapped[str | None] = mapped_column(String(32), nullable=True)  # e.g. curious|uncertain|excited
     # What the agent was thinking about — keywords/topics dominant when written.
     topics: Mapped[list] = mapped_column(JSON, default=list)
     # The cognitive context: which insights/hypotheses/contradictions inspired this entry.
@@ -207,9 +206,61 @@ class Contradiction(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     summary: Mapped[str] = mapped_column(Text)
-    a_chunk_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
-    b_chunk_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    a_chunk_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    b_chunk_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     severity: Mapped[float] = mapped_column(Float, default=0.5)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Conversation(Base):
+    """A user-driven chat thread over the ingested corpus ("Ask EvoMind").
+
+    Distinct from the autopilot's self-generated Question/Answer rows: these are
+    grounded answers to questions a human typed. Each turn is a ChatMessage.
+    """
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    title: Mapped[str] = mapped_column(String(512), default="New conversation")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    messages: Mapped[list[ChatMessage]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    role: Mapped[str] = mapped_column(String(16))  # user|assistant
+    content: Mapped[str] = mapped_column(Text)
+    # For assistant turns: the evidence chunks the answer drew on (same shape as
+    # Answer.citations). Empty for user turns.
+    citations: Mapped[list] = mapped_column(JSON, default=list)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+class Feedback(Base):
+    """Human signal on an answer or a chat reply (thumbs up/down).
+
+    Feeds two things: the eval dashboard (approval rate over time) and the
+    training-corpus export (down-voted pairs can be excluded, up-voted kept).
+    """
+    __tablename__ = "feedback"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    target_kind: Mapped[str] = mapped_column(String(24))  # answer|chat_message
+    target_id: Mapped[str] = mapped_column(String(36), index=True)
+    rating: Mapped[int] = mapped_column(Integer)  # +1 up, -1 down
+    note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -218,12 +269,12 @@ class Job(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     kind: Mapped[str] = mapped_column(String(48))  # ingest|cycle|synthesize|daily
-    target_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="queued")
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     detail: Mapped[str] = mapped_column(Text, default="")
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

@@ -18,11 +18,10 @@ os.environ.setdefault("AUTO_INGEST_ENABLED", "false")
 os.environ.setdefault("PRIMARY_PROVIDER", "ollama")
 os.environ.setdefault("EMBEDDING_PROVIDER", "local")
 
-from fastapi.testclient import TestClient
-
 from app.db import postgres, redis_client
 from app.db.models import Answer, Chunk, Contradiction, Document, Hypothesis, Insight, Job, Memory, Question, Usage
 from app.main import create_app
+from fastapi.testclient import TestClient
 
 
 class SmokeApiTests(unittest.TestCase):

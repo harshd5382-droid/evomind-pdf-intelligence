@@ -3,15 +3,18 @@ from __future__ import annotations
 
 from loguru import logger
 
-from app.db import postgres, qdrant, redis_client, neo4j_store
-from app.db.models import Insight, Hypothesis, Contradiction
+from app.db import neo4j_store, postgres, qdrant, redis_client
+from app.db.models import Contradiction, Hypothesis, Insight
 from app.llm import router as llm
-from app.llm.router import purpose
 from app.llm.prompts import (
-    SYNTHESIS_SYSTEM, SYNTHESIS_USER,
-    HYPOTHESIS_SYSTEM, HYPOTHESIS_USER,
-    CONTRADICTION_SYSTEM, CONTRADICTION_USER,
+    CONTRADICTION_SYSTEM,
+    CONTRADICTION_USER,
+    HYPOTHESIS_SYSTEM,
+    HYPOTHESIS_USER,
+    SYNTHESIS_SYSTEM,
+    SYNTHESIS_USER,
 )
+from app.llm.router import purpose
 
 
 def synthesize_topic(topic: str, top_k: int = 12) -> str | None:

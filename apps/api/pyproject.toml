@@ -1,0 +1,50 @@
+# Tooling config for the EvoMind API. Runtime deps still live in the
+# requirements*.txt files; this file only configures ruff / mypy / pytest.
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+# `app` is the package; tests live alongside it.
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+# A pragmatic starter set: pyflakes (F), pycodestyle (E/W), isort (I),
+# flake8-bugbear (B), pyupgrade (UP), comprehensions (C4).
+select = ["E", "F", "W", "I", "B", "UP", "C4"]
+ignore = [
+    "E501",  # line length is handled by the formatter, not the linter
+    "B008",  # function calls in argument defaults — FastAPI's Depends() pattern
+    # The following are deliberate, pre-existing style choices in this codebase.
+    # Kept off so ruff blocks on *new* real issues rather than a one-time reformat.
+    "E701",  # compact `if cond: return` one-liners
+    "E702",  # compact `a; b` statement pairs
+    "B904",  # `raise ... from` not required for our user-facing error wrapping
+    "B905",  # `zip(...)` without strict= (Python 3.11 baseline tolerates it)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests set os.environ before importing app modules; that ordering is
+# intentional, so allow module-level imports after statements.
+"tests/*" = ["E402"]
+
+[tool.mypy]
+python_version = "3.11"
+# Start lenient — the codebase wasn't written type-first. Tighten over time.
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = false
+no_implicit_optional = false
+check_untyped_defs = false
+exclude = ["tests/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Put the rootdir (apps/api) on sys.path so `import app` works under the bare
+# `pytest` console script too — not just `python -m pytest`. CI runs the former.
+pythonpath = ["."]
+# -ra: show short summary of all non-passing; -q: quiet.
+addopts = "-ra -q"
+filterwarnings = [
+    # SQLAlchemy / pydantic emit deprecation noise we don't control.
+    "ignore::DeprecationWarning",
+]

@@ -2,12 +2,12 @@ from datetime import datetime
 
 from loguru import logger
 
-from app.workers.celery_app import celery
 from app.db import postgres
 from app.db.models import Job
 from app.ingestion.pipeline import ingest_pdf
-from app.modules.orchestrator import run_cycle, run_daily_research
 from app.modules.intelligence.scorer import compute_score
+from app.modules.orchestrator import run_cycle, run_daily_research
+from app.workers.celery_app import celery
 
 
 def _start_job(job_id: str) -> None:
@@ -68,6 +68,18 @@ def daily_research_task() -> dict:
 @celery.task(name="app.workers.tasks.snapshot_intelligence_task")
 def snapshot_intelligence_task() -> dict:
     return compute_score()
+
+
+@celery.task(name="app.workers.tasks.daily_backup_task")
+def daily_backup_task() -> dict:
+    from app.modules.backup import create_backup
+    return create_backup()
+
+
+@celery.task(name="app.workers.tasks.eval_task")
+def eval_task() -> dict:
+    from app.modules.eval import run_eval
+    return run_eval()
 
 
 # ─── Autopilot tasks (periodic, idempotent) ───────────────────────────────

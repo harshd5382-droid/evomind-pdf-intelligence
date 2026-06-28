@@ -27,18 +27,21 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timedelta
-from typing import Any
 
 from loguru import logger
-from sqlalchemy import select, func, desc, or_
+from sqlalchemy import func
 
 from app.db import postgres, redis_client
 from app.db.models import (
-    Document, Question, Answer, Hypothesis, Contradiction, CuriosityGap,
+    Answer,
+    Contradiction,
+    CuriosityGap,
+    Document,
+    Hypothesis,
+    Question,
 )
 from app.llm import router as llm
 from app.llm.router import purpose
-
 
 # ---------------------------------------------------------------------------
 # Gap scoring (no LLM calls)
@@ -53,7 +56,7 @@ def _score_uncovered_concepts(top_n: int = 8) -> list[dict]:
                 if isinstance(k, str) and len(k) >= 4:
                     counts[k.lower()] += 1
         # crude: count questions whose text contains the keyword (case-insensitive)
-        gaps = []
+        gaps: list[dict] = []
         for kw, n_docs in counts.most_common(40):
             if n_docs < 2:  # only consider concepts that appeared in multiple docs
                 continue

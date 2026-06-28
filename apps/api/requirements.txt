@@ -13,6 +13,8 @@ python-multipart>=0.0.12
 python-dotenv>=1.0.0
 tenacity>=9.0.0
 loguru>=0.7.2
+slowapi>=0.1.9
+prometheus-fastapi-instrumentator>=7.0.0
 
 # LLM provider (NVIDIA NIM uses the OpenAI SDK against build.nvidia.com)
 openai>=1.51.0

@@ -141,7 +141,7 @@ def recover_orphaned_jobs() -> dict:
     from datetime import datetime
 
     from app.db import postgres
-    from app.db.models import Job, Document
+    from app.db.models import Document, Job
 
     requeued = 0
     abandoned = 0
@@ -157,7 +157,7 @@ def recover_orphaned_jobs() -> dict:
                 # Find the matching Document and check if its source file exists.
                 doc = s.get(Document, j.target_id) if j.target_id else None
                 path = doc.path if doc else None
-                if path and os.path.exists(path):
+                if doc and path and os.path.exists(path):
                     # Re-enqueue. The pipeline's update-or-create logic will
                     # handle the pre-registered Document shell correctly.
                     try:

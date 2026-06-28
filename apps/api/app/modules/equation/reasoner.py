@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-
 _EQ_SPLIT = re.compile(r"\s*=\s*")
 
 
@@ -28,7 +27,7 @@ def parse_equation(raw: str) -> ParsedEquation | None:
         return None
     lhs, rhs = parts[0].strip(), parts[1].strip()
     try:
-        from sympy import sympify, symbols  # noqa: F401
+        from sympy import symbols, sympify  # noqa: F401
         expr = sympify(rhs, evaluate=False)
         free = sorted({str(s) for s in expr.free_symbols})
         graphable = 1 <= len(free) <= 2
