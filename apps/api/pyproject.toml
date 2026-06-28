@@ -39,6 +39,9 @@ exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Put the rootdir (apps/api) on sys.path so `import app` works under the bare
+# `pytest` console script too — not just `python -m pytest`. CI runs the former.
+pythonpath = ["."]
 # -ra: show short summary of all non-passing; -q: quiet.
 addopts = "-ra -q"
 filterwarnings = [
