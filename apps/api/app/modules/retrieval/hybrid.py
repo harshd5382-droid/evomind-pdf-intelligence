@@ -128,9 +128,10 @@ def hybrid_search(
         if cid in fused:
             fused[cid].bm25_rank = rank
             continue
-        ch, _ = chunk_index.get(cid, (None, None))
-        if ch is None:
+        entry = chunk_index.get(cid)
+        if entry is None:
             continue
+        ch, _ = entry
         fused[cid] = Hit(
             chunk_id=cid,
             document_id=doc_id,

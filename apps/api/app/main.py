@@ -93,7 +93,9 @@ def create_app() -> FastAPI:
     )
     # Rate limiting (slowapi) — attach the shared limiter + 429 handler.
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # slowapi's handler is typed for the narrower RateLimitExceeded, which is
+    # stricter than Starlette's (Request, Exception) handler signature.
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Request-ID middleware — assign/propagate a correlation id and bind it to
     # logs for the duration of the request.

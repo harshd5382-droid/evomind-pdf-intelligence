@@ -56,7 +56,7 @@ def _score_uncovered_concepts(top_n: int = 8) -> list[dict]:
                 if isinstance(k, str) and len(k) >= 4:
                     counts[k.lower()] += 1
         # crude: count questions whose text contains the keyword (case-insensitive)
-        gaps = []
+        gaps: list[dict] = []
         for kw, n_docs in counts.most_common(40):
             if n_docs < 2:  # only consider concepts that appeared in multiple docs
                 continue

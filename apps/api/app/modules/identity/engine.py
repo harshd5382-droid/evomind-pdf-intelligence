@@ -201,7 +201,7 @@ def _generate_narrative(state: dict[str, Any]) -> str:
 
 def update_identity() -> dict[str, Any]:
     """Recompile the self-model and persist it. Returns the new state."""
-    state = {
+    state: dict[str, Any] = {
         "beliefs":        _top_beliefs(),
         "open_questions": _top_open_questions(),
         "active_topics":  _top_active_topics(),

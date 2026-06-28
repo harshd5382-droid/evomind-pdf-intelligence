@@ -667,9 +667,10 @@ async def upload_pdf(request: Request, file: UploadFile = File(...)):
     s = get_settings()
     Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
     _validate_pdf_filename(file)
+    filename = file.filename or ""  # guaranteed non-empty by the validation above
 
     doc_id = str(uuid.uuid4())
-    safe_name = f"{doc_id}_{Path(file.filename).name}"
+    safe_name = f"{doc_id}_{Path(filename).name}"
     target = Path(s.upload_dir) / safe_name
     await _save_upload(file, target, s.max_upload_mb * 1024 * 1024)
 
@@ -704,7 +705,7 @@ async def upload_pdf(request: Request, file: UploadFile = File(...)):
         # Pre-register the document with its hash so concurrent uploads of the
         # same file don't slip past the dedup check before ingest finishes.
         session.add(Document(
-            id=doc_id, title=Path(file.filename).stem, filename=file.filename,
+            id=doc_id, title=Path(filename).stem, filename=filename,
             path=str(target), content_hash=content_hash, status="pending",
         ))
 
@@ -1038,7 +1039,7 @@ def question_tree(qid: str, s: Session = Depends(_db)):
             seen.add(c.id)
             cd = node(c)
             nodes[c.id] = cd
-            parent = nodes.get(c.parent_id)
+            parent = nodes.get(c.parent_id) if c.parent_id else None
             if parent is not None:
                 parent["children"].append(cd)
             next_frontier.append(c.id)

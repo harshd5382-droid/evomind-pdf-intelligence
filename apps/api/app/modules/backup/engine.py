@@ -15,6 +15,7 @@ import sqlite3
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -109,7 +110,7 @@ def create_backup() -> dict:
     dest = backup_dir_path() / bid
     dest.mkdir(parents=True, exist_ok=True)
 
-    manifest = {
+    manifest: dict[str, Any] = {
         "id": bid,
         "created_at": datetime.utcnow().isoformat(),
         "components": {

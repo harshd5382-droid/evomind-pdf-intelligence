@@ -22,7 +22,7 @@ import json
 import re
 import threading
 import time
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from functools import lru_cache
 
 from loguru import logger
@@ -42,7 +42,7 @@ class purpose:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self._token = None
+        self._token: Token[str] | None = None
 
     def __enter__(self) -> purpose:
         self._token = _purpose_var.set(self.name)
