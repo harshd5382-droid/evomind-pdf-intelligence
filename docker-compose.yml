@@ -1,6 +1,15 @@
 # Passwords and API keys come from the environment (.env) with dev-only
 # fallbacks. For any non-local deployment set POSTGRES_PASSWORD / NEO4J_PASSWORD
 # and, if exposing the API, AUTH_ENABLED=true + API_KEYS=<comma-separated>.
+#
+# Configuration reaches the containers two ways:
+#   1. `env_file: .env`  — every knob in .env.example (autopilot cadences,
+#      QUESTIONS_PER_DOC, INGEST_WORKERS, PARSER_PRIORITY, ...). The image
+#      contains no .env of its own, so without this they silently fall back to
+#      the code defaults in app/core/config.py.
+#   2. `environment: <<: *api-env` — infra wiring that MUST point at compose
+#      service names. `environment` takes precedence over `env_file`, so a
+#      localhost POSTGRES_DSN in your .env is correctly overridden here.
 
 x-api-env: &api-env
   POSTGRES_DSN: postgresql+psycopg://evomind:${POSTGRES_PASSWORD:-evomind}@postgres:5432/evomind
@@ -95,6 +104,9 @@ services:
     build:
       context: ./apps/api
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     environment:
       <<: *api-env
     volumes:
@@ -113,6 +125,9 @@ services:
       context: ./apps/api
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery worker --loglevel=info --concurrency=2
+    env_file:
+      - path: .env
+        required: false
     environment:
       <<: *api-env
     volumes:
@@ -127,6 +142,9 @@ services:
       context: ./apps/api
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery beat --loglevel=info
+    env_file:
+      - path: .env
+        required: false
     environment:
       <<: *api-env
     mem_limit: 512m

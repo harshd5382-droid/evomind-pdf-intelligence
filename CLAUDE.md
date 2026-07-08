@@ -100,14 +100,21 @@ Controlled by `PRIMARY_PROVIDER` and `EMBEDDING_PROVIDER` env vars. NVIDIA NIM i
 Copy `.env.example` to `.env`. Critical variables:
 
 ```
-PRIMARY_PROVIDER=nvidia          # nvidia | anthropic | openai | gemini | ollama
+PRIMARY_PROVIDER=nvidia          # nvidia | anthropic | openai | gemini | ollama | groq
 NVIDIA_API_KEY=...               # free at build.nvidia.com
 EMBEDDING_PROVIDER=nvidia        # or local (offline, no key needed)
-QUESTIONS_PER_DOC=5
-RECURSION_DEPTH=2
-AUTONOMY_LEVEL=3                 # 1-5, controls how aggressively the loop runs
+QUESTIONS_PER_DOC=10
+RECURSION_DEPTH=2                # code default is 3; .env.example ships 2
+CONFIDENCE_THRESHOLD=0.55        # below this an answer is marked `unresolved`
 INGEST_WORKERS=2                 # max 8 for NVIDIA free tier rate limits
+AUTOPILOT_ENABLED=true           # in-process continuous research loop
 ```
+
+`AUTONOMY_LEVEL` (`cautious|balanced|aggressive`) and `CREATIVITY` are parsed into `Settings` and
+echoed by `GET /api/config`, but **no code reads them** — they are reserved, not wired.
+
+Docker: `docker-compose.yml` loads `.env` via `env_file` for these knobs, while the `environment:`
+block overrides the infra DSNs to point at compose service names.
 
 ## Important Patterns
 

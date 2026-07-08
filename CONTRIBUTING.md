@@ -103,7 +103,7 @@ These are load-bearing — please don't bypass them without discussion:
 
 ## Pull request process
 
-1. **Fork** the repo and create a branch from `main`:
+1. **Fork** the repo and create a branch from `master` (the default branch):
    - `feat/<short-name>` for features
    - `fix/<short-name>` for bug fixes
    - `docs/<short-name>` for documentation

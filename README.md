@@ -6,6 +6,7 @@
 
 ### An autonomous research agent that reads your PDFs, asks its own questions, and grows a living knowledge graph.
 
+[![CI](https://github.com/harshd5382-droid/evomind-pdf-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/harshd5382-droid/evomind-pdf-intelligence/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
@@ -37,22 +38,21 @@ learning while you sleep.
 
 ---
 
-## 📸 Demo
+## 📸 What you get
 
-<!--
-  To add screenshots: run the app, capture each page, and save the PNGs as
-  docs/screenshots/dashboard.png, feed.png, and graph.png. They will render
-  automatically below. Until then, the captions describe each view.
--->
+| View | What it shows |
+|------|---------------|
+| **Dashboard** | Live intelligence score with trend, document table, ingest-queue status, LLM token spend |
+| **Research Feed** | Real-time SSE stream — every question, answer, insight, and contradiction as it happens |
+| **Mind** | The agent's self-model: first-person narrative, current beliefs, known unknowns, and what it's curious about |
+| **Knowledge Graph** | Force-directed graph of papers ↔ concepts ↔ insights ↔ hypotheses |
+| **Ask EvoMind** | Grounded chat over your corpus, with inline citations and confidence |
+| **Question Tree** | The recursive question hierarchy the agent generated for itself |
 
-### Dashboard — live metrics & intelligence score
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-
-### Research Feed — real-time SSE event stream
-<!-- ![Research Feed](docs/screenshots/feed.png) -->
-
-### Knowledge Graph — papers ↔ concepts ↔ hypotheses
-<!-- ![Knowledge Graph](docs/screenshots/graph.png) -->
+> 📷 **Screenshots wanted!** This is a visual product and the README doesn't yet show it off.
+> Capturing the six views above is
+> [issue #9](https://github.com/harshd5382-droid/evomind-pdf-intelligence/issues/9) — a great
+> first contribution. Drop the PNGs in `docs/screenshots/` and link them here.
 
 ---
 
@@ -200,12 +200,17 @@ most likely touch:
 | `EMBEDDING_PROVIDER` | `nvidia` | `nvidia` \| `local` (offline sentence-transformers) \| `openai` |
 | `QUESTIONS_PER_DOC` | `10` | Root questions generated per document |
 | `RECURSION_DEPTH` | `2` | How deep follow-up questions go |
-| `AUTONOMY_LEVEL` | `balanced` | How aggressively the loop runs |
+| `CONFIDENCE_THRESHOLD` | `0.55` | Below this, an answer is marked `unresolved` instead of `answered` |
 | `INGEST_WORKERS` | `2` | Parallel PDF ingest threads (keep at 2 for NVIDIA free tier) |
 | `AUTOPILOT_ENABLED` | `true` | Run the continuous research loop automatically |
+| `AUTOPILOT_SOLVE_BATCH` | `3` | Questions drained per solve tick (each costs ~2 LLM calls) |
 
 See [`.env.example`](.env.example) for the full annotated list (autopilot intervals, parser fallback
 chain, infra DSNs, and more).
+
+> ⚠️ `AUTONOMY_LEVEL` and `CREATIVITY` are accepted and surfaced in the Settings UI, but are **not
+> yet read by any code path** — they're reserved. Tracking issue: wiring `CREATIVITY` to the
+> questioner/learner sampling temperature. Don't expect them to change behavior today.
 
 ---
 
@@ -259,6 +264,12 @@ score + history · live SSE feed · knowledge graph · autopilot + drop-folder i
 **Intentionally minimal (great contribution targets):** auth / multi-tenancy is stubbed (open API —
 add JWT/OAuth as needed); the equation reasoner is sympy parsing + variable extraction; "teach me",
 flashcards, and voice briefings are not yet implemented.
+
+**⚠️ Not yet safe to expose on a network.** `AUTH_ENABLED` defaults to `false` and `docker compose`
+publishes port 8000 on all interfaces. Run it on `localhost`, or set `AUTH_ENABLED=true` +
+`API_KEYS=...` and bind to `127.0.0.1` first. See [SECURITY.md](SECURITY.md).
+
+See the **[Roadmap](ROADMAP.md)** for what's planned, what's a non-goal, and where to help.
 
 ---
 
