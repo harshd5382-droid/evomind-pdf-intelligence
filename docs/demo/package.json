@@ -1,0 +1,14 @@
+{
+  "name": "evomind-demo-capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Records the README hero GIF by driving the real EvoMind UI.",
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "gif": "bash make-gif.sh"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

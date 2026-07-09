@@ -15,6 +15,16 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![good first issues](https://img.shields.io/badge/good%20first%20issues-open-7057ff.svg)](../../issues?q=label%3A%22good+first+issue%22)
 
+<br/>
+
+<!-- DEMO:START -->
+<a href="docs/demo/README.md">
+  <img src="docs/demo/demo-poster.svg" alt="EvoMind demo — run make demo-gif to generate the live capture" width="820" />
+</a>
+<!-- DEMO:END -->
+
+<sub>▶ <b>Live demo</b> — drop a PDF, watch it question, solve, and graph itself. Generate the real capture with <code>make demo-gif</code> (<a href="docs/demo/README.md">how</a>).</sub>
+
 </div>
 
 ---
