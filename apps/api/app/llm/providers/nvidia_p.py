@@ -32,6 +32,37 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
     return False
 
 
+def _is_auth_error(exc: BaseException) -> bool:
+    """True when NVIDIA rejected the credentials (HTTP 401/403), as opposed to a
+    transient error. NIM answers a bad/expired key with 403 'Authorization failed'
+    and a missing/wrong-scoped one with 401."""
+    cls = type(exc).__name__
+    if cls in ("AuthenticationError", "PermissionDeniedError"):
+        return True
+    status = getattr(exc, "status_code", None)
+    resp = getattr(exc, "response", None)
+    resp_status = getattr(resp, "status_code", None) if resp is not None else None
+    if status in (401, 403) or resp_status in (401, 403):
+        return True
+    msg = str(exc) or ""
+    return "401" in msg or "403" in msg or "Authorization failed" in msg
+
+
+def _reraise(exc: Exception):
+    """Re-raise, but turn an opaque provider auth failure into an actionable one.
+
+    A raw `403 Forbidden` from the OpenAI-compatible client tells the operator
+    nothing about *which* credential failed; surface the fix instead."""
+    if _is_auth_error(exc):
+        raise RuntimeError(
+            "NVIDIA rejected the API key (HTTP 401/403 Authorization failed). Check "
+            "that NVIDIA_API_KEY is valid, not expired, has no stray whitespace, and "
+            "that your account can access the configured NVIDIA_MODEL. Get a fresh "
+            f"free key at https://build.nvidia.com. Original error: {exc}"
+        ) from exc
+    raise exc
+
+
 def _nvidia_keys(settings) -> list[str]:
     keys: list[str] = []
     for key in [settings.nvidia_api_key, settings.nvidia_api_key_backup]:
@@ -122,9 +153,9 @@ class NvidiaProvider(LLMProvider):
                 last_exc = e
                 if idx < len(self.clients) - 1 and _is_rate_limit_error(e):
                     continue
-                raise
+                _reraise(e)
         if last_exc is not None:
-            raise last_exc
+            _reraise(last_exc)
         raise RuntimeError("NVIDIA chat failed without a response")
 
     @staticmethod
@@ -217,10 +248,10 @@ class NvidiaEmbeddings(EmbeddingProvider):
                 last_exc = e
                 if idx < len(self.clients) - 1 and _is_rate_limit_error(e):
                     continue
-                raise
+                _reraise(e)
         if resp is None:
             if last_exc is not None:
-                raise last_exc
+                _reraise(last_exc)
             raise RuntimeError("NVIDIA embeddings failed without a response")
         if resp.usage:
             try:

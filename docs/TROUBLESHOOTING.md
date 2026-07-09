@@ -59,6 +59,47 @@ and individual calls can be slow, especially with reasoning enabled.
 
 ---
 
+## `403 Forbidden` / `Authorization failed` on LLM calls
+
+**Symptom** — ingestion succeeds (the document is detected, parsed, and chunked),
+but the pipeline stalls at question generation. The logs show every LLM request
+failing with `403 Forbidden` / `Authorization failed`, so no questions, feed
+entries, or knowledge-graph nodes are produced and dashboard metrics stay at zero.
+
+**Cause** — this 403 comes from the **LLM provider (NVIDIA NIM), not from
+EvoMind's own auth.** It means the `NVIDIA_API_KEY` in your `.env` is present but
+being *rejected* — expired, revoked, mistyped, or carrying stray whitespace — or
+your account can't access the configured `NVIDIA_MODEL`. Ingestion works because
+PDF parsing and (with `EMBEDDING_PROVIDER=local`) embedding don't call the chat
+LLM; question generation is the first step that does, which is why it stops there.
+
+> A *missing* key surfaces differently — `RuntimeError: NVIDIA_API_KEY is not
+> configured` — so a 403 specifically means a key is set and refused.
+
+**Fixes**
+
+- Get a fresh key at https://build.nvidia.com (free-tier keys rotate/expire) and
+  paste it into `NVIDIA_API_KEY` with no leading/trailing spaces or newline. It is
+  used for both `PRIMARY_PROVIDER=nvidia` and `EMBEDDING_PROVIDER=nvidia`.
+- Confirm your account can access the model in `NVIDIA_MODEL`.
+- Verify the key independently of EvoMind, straight against the NIM endpoint:
+
+  ```bash
+  curl https://integrate.api.nvidia.com/v1/models \
+    -H "Authorization: Bearer $NVIDIA_API_KEY"
+  ```
+
+  A 403 here confirms the key/account is the problem, not EvoMind.
+- To run without a NIM key, point `PRIMARY_PROVIDER` at a local Ollama model (see
+  `OLLAMA_SETUP.md`) or another provider you hold a valid key for, and set
+  `EMBEDDING_PROVIDER=local` for offline, key-free embeddings.
+
+Once the key is valid, the feed / questions / graph populate on the next research
+cycle. (Note this is distinct from the `401` below, which is EvoMind's *own*
+inbound auth rejecting a request to a mutating endpoint.)
+
+---
+
 ## `pg_dump not found` when taking a backup
 
 **Symptom** — `POST /api/backup/now` (or the scheduled `daily-backup`) returns
