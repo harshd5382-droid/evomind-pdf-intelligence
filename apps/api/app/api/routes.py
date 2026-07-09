@@ -34,7 +34,6 @@ from app.api.schemas import (
 )
 from app.core.cache import ttl_cache
 from app.core.config import get_settings
-from app.core.ratelimit import limiter
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
 from app.core.ratelimit import limiter
 from app.core.security import require_api_key
