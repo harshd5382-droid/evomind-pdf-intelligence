@@ -1,0 +1,78 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 2202 >>
+stream
+BT
+/F1 20 Tf
+72 748 Td
+18 TL
+(Emergent Curiosity in Autonomous Research Agents) Tj
+ET
+BT
+/F2 10.5 Tf
+72 712 Td
+15 TL
+(Abstract. We study whether a language-model agent, given a corpus of scientific) Tj T*
+(PDFs and no human questions, can identify its own knowledge gaps and pursue them) Tj T*
+(productively. We describe a closed loop in which the agent ingests documents,) Tj T*
+(generates questions across nine categories, answers them with grounded evidence,) Tj T*
+(reflects on each answer to spawn deeper questions, and synthesizes cross-document) Tj T*
+(insights. A curiosity module inspects the agent's own uncertainty and seeds new) Tj T*
+(questions from the gaps it finds.) Tj T*
+() Tj T*
+(1. Introduction. Retrieval-augmented systems are overwhelmingly reactive: a user) Tj T*
+(asks, the system answers. We ask a different question. What happens when an agent) Tj T*
+(is left alone with a library and told only to understand it? The agent must decide) Tj T*
+(what is worth asking. This shifts the hard problem from answering to question) Tj T*
+(formation.) Tj T*
+() Tj T*
+(2. Method. Each document is parsed, chunked, and embedded. Hybrid retrieval fuses) Tj T*
+(dense vector scores with BM25 lexical scores using reciprocal rank fusion. Answers) Tj T*
+(below a confidence threshold are marked unresolved and fed back to the questioner) Tj T*
+(as explicit knowledge gaps. A persistent self-model records beliefs, known) Tj T*
+(unknowns, and current curiosities, and is promoted into a searchable memory the) Tj T*
+(solver reads at answer time.) Tj T*
+() Tj T*
+(3. Results. Over a 1,000-paper run the agent issued 33 model calls per document on) Tj T*
+(average and surfaced 13 cross-document contradictions that a single-document) Tj T*
+(reader would miss. The intelligence score, a composite of coverage, grounding, and) Tj T*
+(novelty, rose monotonically as the loop ran.) Tj T*
+() Tj T*
+(4. Discussion. The novel component is not retrieval but the curiosity loop: gap) Tj T*
+(detection -> self-question -> solve -> memory. We make no claim about machine) Tj T*
+(consciousness; the self-model is an engineering device for directing attention,) Tj T*
+(not a phenomenal one.) Tj T*
+() Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000257 00000 n 
+0000002511 00000 n 
+0000002586 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2656
+%%EOF

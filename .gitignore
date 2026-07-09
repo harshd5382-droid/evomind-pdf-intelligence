@@ -46,3 +46,9 @@ Thumbs.db
 
 # Keep the screenshots placeholder tracked
 !docs/screenshots/.gitkeep
+
+# Demo capture kit — generated locally, not committed
+docs/demo/node_modules/
+docs/demo/package-lock.json
+docs/demo/*.webm
+docs/demo/_pal.png
