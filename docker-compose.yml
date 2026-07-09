@@ -114,6 +114,13 @@ services:
     ports: ["8000:8000"]
     mem_limit: 2g
     cpus: 2.0
+    healthcheck:
+      # The api image is Python-only (no curl/wget), so probe via urllib.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=4).status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
@@ -135,7 +142,7 @@ services:
     mem_limit: 2g
     cpus: 2.0
     depends_on:
-      api: { condition: service_started }
+      api: { condition: service_healthy }
 
   beat:
     build:
@@ -150,20 +157,24 @@ services:
     mem_limit: 512m
     cpus: 0.5
     depends_on:
-      api: { condition: service_started }
+      api: { condition: service_healthy }
 
   web:
     build:
       context: ./apps/web
+      args:
+        # server-side only: used by next.config.mjs rewrites() at build time to
+        # proxy /api/* to the backend over the compose network. Must NOT be
+        # NEXT_PUBLIC_*, or it leaks into the browser bundle where "api" can't
+        # resolve. Leave NEXT_PUBLIC_API_URL unset so the client calls the
+        # same-origin /api path instead.
+        API_PROXY_TARGET: http://api:8000
     restart: unless-stopped
-    environment:
-      # used by next.config.mjs rewrites — must be reachable from the web container
-      NEXT_PUBLIC_API_URL: http://api:8000
     ports: ["3000:3000"]
     mem_limit: 1g
     cpus: 1.0
     depends_on:
-      api: { condition: service_started }
+      api: { condition: service_healthy }
 
 volumes:
   pgdata:

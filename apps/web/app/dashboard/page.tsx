@@ -498,7 +498,7 @@ export default function Dashboard() {
                 || JSON.stringify(ev).slice(0, 120);
               return (
                 <div
-                  key={i}
+                  key={ev._event_id ?? `${ev.type}-${ev._t ?? ev.timestamp ?? i}`}
                   className="feed-row py-1.5 border-b border-border/30 group animate-fade-in"
                   style={{ animationDelay: `${i * 20}ms` }}
                 >

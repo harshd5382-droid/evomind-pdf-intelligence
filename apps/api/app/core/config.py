@@ -67,7 +67,6 @@ class Settings(BaseSettings):
     # Qdrant
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "evomind_chunks"
-    embedding_dim: int = 384
 
     # Neo4j
     neo4j_uri: str = "bolt://localhost:7687"

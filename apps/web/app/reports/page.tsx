@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, apiOr } from "@/lib/api";
+import { pct } from "@/lib/format";
 import { formatRelative } from "@/lib/utils";
 import { Download, FileText, Gauge, Loader2 } from "lucide-react";
 
@@ -143,7 +144,6 @@ function QualityPanel() {
     }
   }
 
-  const pct = (v: number | undefined) => (typeof v === "number" ? `${(v * 100).toFixed(0)}%` : "—");
 
   return (
     <section className="mb-8 border border-border bg-panel/60 p-5">

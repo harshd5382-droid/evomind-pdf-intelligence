@@ -32,6 +32,9 @@ apps/api/data/uploads/
 .codex-logs/
 *.log
 
+# Playwright MCP session artifacts (console/page dumps)
+.playwright-mcp/
+
 # Claude Code project metadata
 .claude/
 

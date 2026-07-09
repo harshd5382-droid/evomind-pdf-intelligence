@@ -727,7 +727,9 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     # Write files to disk + hash them. Track new vs duplicate.
     new_items: list[tuple[str, str, str, str, str]] = []  # (doc_id, job_id, target, fname, hash)
     dup_items: list[dict] = []
+    rejected_items: list[dict] = []  # files that failed validation (bad type / oversized)
     intra_batch_hashes: dict[str, str] = {}  # hash → doc_id (catch dupes within this same batch)
+    max_bytes = s.max_upload_mb * 1024 * 1024
 
     for file in files:
         if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -735,12 +737,18 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
         doc_id = str(uuid.uuid4())
         safe_name = f"{doc_id}_{Path(file.filename).name}"
         target = Path(s.upload_dir) / safe_name
-        with target.open("wb") as fh:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                fh.write(chunk)
+        # Reuse the single-upload guard: enforces the per-file size cap and the
+        # %PDF magic check, aborting+removing the partial file on violation. A
+        # rejected file is reported rather than failing the whole batch.
+        try:
+            await _save_upload(file, target, max_bytes)
+        except HTTPException as e:
+            rejected_items.append({
+                "filename": file.filename,
+                "rejected": True,
+                "reason": e.detail,
+            })
+            continue
 
         try:
             content_hash = _hash_file(target)
@@ -786,10 +794,12 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
         out.append({"document_id": doc_id, "job_id": job_id, "filename": fname,
                     "queued": False, "duplicate": False})
     out.extend(dup_items)
+    out.extend(rejected_items)
     return {
         "count": len(out),
         "new": len(new_items),
         "duplicates": len(dup_items),
+        "rejected": len(rejected_items),
         "items": out,
     }
 

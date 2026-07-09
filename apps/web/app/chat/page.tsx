@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageSquare, Send, FileText, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { pct } from "@/lib/format";
 
 type Citation = {
   document_id: string;
@@ -58,6 +59,7 @@ export default function ChatPage() {
       const reply = await api<ChatReply>("/chat", {
         method: "POST",
         body: JSON.stringify({ message, conversation_id: conversationId.current }),
+        timeoutMs: 120_000, // LLM answer can be slow; allow more than the default
       });
       conversationId.current = reply.conversation_id;
       setMessages((m) => [
@@ -197,7 +199,7 @@ function MessageBubble({ msg }: { msg: Msg }) {
           <div className="mt-1.5 flex items-center gap-3">
             {typeof msg.confidence === "number" && (
               <span className="font-mono text-[9px] text-dim uppercase tracking-[0.12em]">
-                confidence {(msg.confidence * 100).toFixed(0)}%
+                confidence {pct(msg.confidence)}
               </span>
             )}
             {msg.id && <Feedback messageId={msg.id} />}
