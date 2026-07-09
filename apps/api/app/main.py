@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from loguru import logger
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
@@ -91,11 +92,15 @@ def create_app() -> FastAPI:
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=oauth2_redirect_url,
     )
-    # Rate limiting (slowapi) — attach the shared limiter + 429 handler.
+    # Rate limiting (slowapi) — attach the shared limiter + 429 handler, and
+    # register SlowAPIMiddleware so the configured `default_limits` actually
+    # apply to every route (without it, RATE_LIMIT_DEFAULT is dead config and
+    # only routes with an explicit @limiter.limit() decorator are throttled).
     app.state.limiter = limiter
     # slowapi's handler is typed for the narrower RateLimitExceeded, which is
     # stricter than Starlette's (Request, Exception) handler signature.
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_middleware(SlowAPIMiddleware)
 
     # Request-ID middleware — assign/propagate a correlation id and bind it to
     # logs for the duration of the request.

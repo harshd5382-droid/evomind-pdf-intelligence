@@ -23,8 +23,14 @@ def _safe_avg(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def compute_score() -> dict:
-    """Combine concept count, solved questions, gap reduction, hypotheses, confidence trend."""
+def compute_score(persist: bool = True) -> dict:
+    """Combine concept count, solved questions, gap reduction, hypotheses, confidence trend.
+
+    ``persist`` writes an ``intelligence_score`` snapshot row. Scheduled callers
+    (autopilot, cycle) leave it True to build score history; read-only callers on
+    a hot poll path (the dashboard's ``/metrics``) pass False so an idle open tab
+    can't spew ~thousands of Metric rows/day.
+    """
     with postgres.session_scope() as s:
         n_docs = s.query(func.count(Document.id)).scalar() or 0
         n_chunks = s.query(func.count(Chunk.id)).scalar() or 0
@@ -67,8 +73,9 @@ def compute_score() -> dict:
         "avg_confidence": round(avg_confidence, 3),
     }
 
-    with postgres.session_scope() as s:
-        s.add(Metric(name="intelligence_score", value=snapshot["score"], extra=snapshot))
+    if persist:
+        with postgres.session_scope() as s:
+            s.add(Metric(name="intelligence_score", value=snapshot["score"], extra=snapshot))
     return snapshot
 
 

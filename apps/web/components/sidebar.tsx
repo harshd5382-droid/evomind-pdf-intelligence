@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { useVisiblePolling } from "@/lib/usePolling";
 
 const NAV = [
   { href: "/dashboard",  label: "Dashboard",      icon: LayoutDashboard },
@@ -41,13 +42,10 @@ export function Sidebar() {
     localStorage.setItem("theme", next ? "dark" : "light");
   }
 
-  useEffect(() => {
-    let alive = true;
-    const tick = () => api<ApStatus>("/autopilot/status").then((s) => alive && setAp(s)).catch(() => {});
-    tick();
-    const id = setInterval(tick, 10_000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+  useVisiblePolling(
+    () => api<ApStatus>("/autopilot/status").then(setAp).catch(() => {}),
+    10_000,
+  );
 
   return (
     <aside className="w-56 shrink-0 min-h-screen flex flex-col bg-panel border-r border-border relative overflow-hidden">

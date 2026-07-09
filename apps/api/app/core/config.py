@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     # Storage
     data_dir: str = "./data"
     upload_dir: str = "./data/uploads"
+    # Server-side folder ingest (POST /upload/folder) is confined to this root
+    # so an authenticated caller can't point it at arbitrary host paths (e.g.
+    # /etc, C:\Users) and enumerate/ingest PDFs off the box. Empty = confine to
+    # data_dir; set FOLDER_INGEST_ROOT=/path/to/library to ingest a real corpus.
+    folder_ingest_root: str = ""
+
+    @property
+    def folder_ingest_root_path(self) -> Path:
+        base = self.folder_ingest_root.strip() or self.data_dir
+        return Path(base).expanduser().resolve()
 
     # Postgres
     postgres_dsn: str = "postgresql+psycopg://evomind:evomind@localhost:5432/evomind"

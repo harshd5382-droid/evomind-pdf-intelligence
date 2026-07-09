@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
+import { useVisiblePolling } from "@/lib/usePolling";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { api, apiOr, safeWriteText, uploadPdf } from "@/lib/api";
@@ -147,11 +148,7 @@ export default function Dashboard() {
     setMetrics(m); setDocs(d); setFeed(f); setUsage(u); setJobStats(js); setAutopilot(ap); setWatcher(wt); setDiagnostics(diag);
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 8_000);
-    return () => clearInterval(id);
-  }, []);
+  useVisiblePolling(refresh, 8_000);
 
   async function handleUpload(file: File) {
     setBusy(true);
