@@ -85,3 +85,21 @@ def test_upload_accepts_pdf_magic(client, clean_db):
     # Passes validation and registers a job (ingest itself runs async).
     assert res.status_code == 200
     assert res.json()["document_id"]
+
+
+def test_batch_upload_enforces_per_file_size_cap(client, clean_db, monkeypatch):
+    # Regression: /upload/batch previously streamed files to disk with no size
+    # cap, unlike /upload. An oversized file must be rejected (not ingested) and
+    # reported without failing the whole batch.
+    s = get_settings()
+    monkeypatch.setattr(s, "max_upload_mb", 1)
+    oversized = b"%PDF-1.4" + b"0" * (2 * 1024 * 1024)  # ~2 MB, valid PDF magic
+    res = client.post(
+        "/api/upload/batch",
+        files={"files": ("big.pdf", oversized, "application/pdf")},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["new"] == 0
+    assert body["rejected"] == 1
+    assert body["items"][0]["rejected"] is True

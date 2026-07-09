@@ -62,8 +62,8 @@ jobs:
         continue-on-error: true
 
       - name: Tests (pytest + coverage)
-        # Coverage floor starts low and should be ratcheted up over time.
-        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=30
+        # Coverage floor is ratcheted up over time as tests are added.
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=40
 
       # Dependency CVE scan is advisory — transitive advisories shouldn't block
       # a feature PR, but we want them visible in the log.

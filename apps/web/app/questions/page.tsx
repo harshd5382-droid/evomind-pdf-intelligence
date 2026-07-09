@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, apiOr } from "@/lib/api";
+import { pct } from "@/lib/format";
 import { ChevronRight, ChevronDown, Sparkles, HelpCircle, Cpu } from "lucide-react";
 
 type Q = {
@@ -16,6 +17,7 @@ export default function QuestionsPage() {
   const [filter, setFilter] = useState<string>("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [error,  setError]  = useState<string | null>(null);
 
   async function load() {
     const data = await apiOr<Q[]>(
@@ -71,6 +73,18 @@ export default function QuestionsPage() {
         Root Questions — {roots.length}
       </div>
 
+      {error && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 border border-bad/40 bg-bad/8">
+          <span className="font-mono text-[11px] text-bad">{error}</span>
+          <button
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-dim hover:text-sub"
+            onClick={() => setError(null)}
+          >
+            dismiss
+          </button>
+        </div>
+      )}
+
       {loaded && roots.length === 0 ? (
         <div className="font-mono text-[11px] text-dim border border-border/50 py-8 text-center">
           No questions yet — run an autonomous cycle.
@@ -84,8 +98,15 @@ export default function QuestionsPage() {
               busy={busyId === q.id}
               onSolve={async () => {
                 setBusyId(q.id);
-                try { await api(`/questions/${q.id}/solve`, { method: "POST" }); await load(); }
-                finally { setBusyId(null); }
+                setError(null);
+                try {
+                  await api(`/questions/${q.id}/solve`, { method: "POST", timeoutMs: 120_000 });
+                  await load();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Failed to solve question");
+                } finally {
+                  setBusyId(null);
+                }
               }}
             />
           ))}
@@ -142,7 +163,7 @@ function Node({ q, onSolve, busy }: { q: Q; onSolve: () => void; busy: boolean }
               {answers.map((a) => (
                 <div key={a.id} className="border border-border/60 bg-panel p-3">
                   <div className="font-mono text-[9px] text-dim mb-2 uppercase tracking-[0.12em]">
-                    confidence {(a.confidence * 100).toFixed(0)}%
+                    confidence {pct(a.confidence)}
                   </div>
                   <div className="text-[12.5px] text-sub leading-relaxed whitespace-pre-wrap">
                     {a.text}

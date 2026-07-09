@@ -14,6 +14,8 @@ Usage:
 """
 from __future__ import annotations
 
+import hmac
+
 from fastapi import Header, HTTPException
 
 from app.core.config import get_settings
@@ -50,7 +52,10 @@ def require_api_key(
         )
 
     key = _extract_key(authorization, x_api_key)
-    if not key or key not in allowed:
+    # Constant-time compare against every configured key. A plain `key in allowed`
+    # short-circuits and leaks timing about how many leading characters matched,
+    # which can help an attacker recover a valid key byte-by-byte.
+    if not key or not any(hmac.compare_digest(key, a) for a in allowed):
         raise HTTPException(
             status_code=401,
             detail="missing or invalid API key",

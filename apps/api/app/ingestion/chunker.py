@@ -23,9 +23,21 @@ def _detect_section(line: str, current: str | None) -> str | None:
     return current
 
 
+# Connective words that betray prose — a line like "score = good AND fast" has an
+# '=' but is a sentence, not a formula. Their presence disqualifies a formula match.
+_PROSE_WORDS = {
+    "and", "or", "the", "is", "are", "was", "were", "if", "then", "else", "for",
+    "with", "that", "this", "which", "because", "however", "therefore", "when",
+}
+
+
 def _is_formula_line(s: str) -> bool:
     if "=" in s and len(s) < 200 and re.search(r"[A-Za-z]", s) and not s.endswith("."):
-        # Heuristic: has =, contains a letter, not too long, not a sentence
+        # Heuristic: has =, contains a letter, not too long, not a sentence.
+        # Reject prose that merely contains '=' by looking for connective words.
+        tokens = {t.strip(".,;:()[]{}").lower() for t in s.split()}
+        if tokens & _PROSE_WORDS:
+            return False
         non_alnum = sum(1 for c in s if not c.isalnum() and not c.isspace())
         return non_alnum >= 2
     return False

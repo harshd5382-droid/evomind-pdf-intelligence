@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
+import { useVisiblePolling } from "@/lib/usePolling";
 import { Brain, MessageCircle, HelpCircle, AlertTriangle, Eye, Sparkles, RefreshCw, BookOpen, Compass, GraduationCap, Pencil } from "lucide-react";
 
 type Belief = { id: string; statement: string; rationale: string; supporting: number; opposing: number };
@@ -129,11 +130,7 @@ export default function MindPage() {
     } catch (e) { console.error(e); }
   }
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 12_000);
-    return () => clearInterval(t);
-  }, []);
+  useVisiblePolling(load, 12_000);
 
   async function refreshNow() {
     setRefreshing(true);

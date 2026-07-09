@@ -7,6 +7,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# next.config.mjs resolves rewrites() at build time, so the proxy target must
+# be present here. This is deliberately NOT NEXT_PUBLIC_API_URL: that var gets
+# inlined into the client bundle, and "api" (the Docker service name) isn't
+# resolvable from the browser — only from inside the compose network.
+ARG API_PROXY_TARGET
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 RUN npm run build
 
 FROM node:20-alpine AS runner

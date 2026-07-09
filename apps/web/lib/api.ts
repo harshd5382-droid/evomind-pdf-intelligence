@@ -16,18 +16,39 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.text());
-  const text = await res.text();
-  return text ? JSON.parse(text) : (null as T);
+// Default per-request timeout so a hung backend can't freeze the tab forever.
+// Callers can override (e.g. pass a longer AbortSignal) or disable with 0.
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+export async function api<T = any>(
+  path: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...rest } = init;
+  // Only arm our own timeout when the caller hasn't supplied a signal.
+  const controller = !callerSignal && timeoutMs > 0 ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      ...rest,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers || {}),
+      },
+      cache: "no-store",
+      signal: callerSignal ?? controller?.signal,
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const text = await res.text();
+    return text ? JSON.parse(text) : (null as T);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError" && controller) {
+      throw new ApiError(408, `Request timed out after ${timeoutMs}ms: ${path}`);
+    }
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export const apiUrl = (p: string) => `${BASE}${p}`;

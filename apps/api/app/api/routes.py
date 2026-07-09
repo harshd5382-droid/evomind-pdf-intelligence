@@ -34,6 +34,7 @@ from app.api.schemas import (
 )
 from app.core.cache import ttl_cache
 from app.core.config import get_settings
+from app.core.ratelimit import limiter
 from app.core.diagnostics import collect_runtime_diagnostics, integrity_report
 from app.core.ratelimit import limiter
 from app.core.security import require_api_key
@@ -224,7 +225,7 @@ def autopilot_status():
     return autopilot.status()
 
 
-@router.post("/autopilot/run-now")
+@router.post("/autopilot/run-now", dependencies=[Depends(require_api_key)])
 def autopilot_run_now():
     """Trigger every autopilot phase immediately on a background thread,
     bypassing the interval gate. Useful for impatient debugging — the loop
@@ -256,7 +257,7 @@ def folder_watcher_status():
     return folder_watcher.status()
 
 
-@router.post("/folder-watcher/scan-now")
+@router.post("/folder-watcher/scan-now", dependencies=[Depends(require_api_key)])
 def folder_watcher_scan_now():
     """Force an immediate scan of the auto-ingest folder."""
     from pathlib import Path
@@ -727,7 +728,9 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
     # Write files to disk + hash them. Track new vs duplicate.
     new_items: list[tuple[str, str, str, str, str]] = []  # (doc_id, job_id, target, fname, hash)
     dup_items: list[dict] = []
+    rejected_items: list[dict] = []  # files that failed validation (bad type / oversized)
     intra_batch_hashes: dict[str, str] = {}  # hash → doc_id (catch dupes within this same batch)
+    max_bytes = s.max_upload_mb * 1024 * 1024
 
     for file in files:
         if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -735,12 +738,18 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
         doc_id = str(uuid.uuid4())
         safe_name = f"{doc_id}_{Path(file.filename).name}"
         target = Path(s.upload_dir) / safe_name
-        with target.open("wb") as fh:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                fh.write(chunk)
+        # Reuse the single-upload guard: enforces the per-file size cap and the
+        # %PDF magic check, aborting+removing the partial file on violation. A
+        # rejected file is reported rather than failing the whole batch.
+        try:
+            await _save_upload(file, target, max_bytes)
+        except HTTPException as e:
+            rejected_items.append({
+                "filename": file.filename,
+                "rejected": True,
+                "reason": e.detail,
+            })
+            continue
 
         try:
             content_hash = _hash_file(target)
@@ -786,10 +795,12 @@ async def upload_pdf_batch(files: list[UploadFile] = File(...)):
         out.append({"document_id": doc_id, "job_id": job_id, "filename": fname,
                     "queued": False, "duplicate": False})
     out.extend(dup_items)
+    out.extend(rejected_items)
     return {
         "count": len(out),
         "new": len(new_items),
         "duplicates": len(dup_items),
+        "rejected": len(rejected_items),
         "items": out,
     }
 
@@ -810,7 +821,14 @@ def ingest_folder(payload: dict):
     if ".." in Path(raw_path).parts:
         raise HTTPException(400, "Path traversal ('..') is not allowed")
 
-    folder = Path(raw_path).expanduser()
+    # Resolve to an absolute, symlink-collapsed path and confine it to the
+    # configured ingest root. Without this, an absolute path (no ".." needed)
+    # like "/etc" or "C:\\Users" would let a caller enumerate/ingest any PDF on
+    # the host — a file-disclosure vector even though this route requires auth.
+    folder = Path(raw_path).expanduser().resolve()
+    root = get_settings().folder_ingest_root_path
+    if not folder.is_relative_to(root):
+        raise HTTPException(403, f"Path must be inside the ingest root: {root}")
     if not folder.exists() or not folder.is_dir():
         raise HTTPException(400, f"Folder not found or not a directory: {folder}")
 
@@ -874,7 +892,7 @@ def ingest_folder(payload: dict):
 
 
 # ------------- Analyze (generate questions for one doc) -------------
-@router.post("/analyze")
+@router.post("/analyze", dependencies=[Depends(require_api_key)])
 def analyze(req: AnalyzeRequest):
     try:
         ids = generate_for_document(req.document_id, n=req.n_questions)
@@ -884,7 +902,7 @@ def analyze(req: AnalyzeRequest):
 
 
 # ------------- Autonomous cycle -------------
-@router.post("/run-autonomous-cycle")
+@router.post("/run-autonomous-cycle", dependencies=[Depends(require_api_key)])
 def run_cycle_endpoint(req: CycleRequest):
     job_id = str(uuid.uuid4())
     with postgres.session_scope() as s:
@@ -1047,7 +1065,7 @@ def question_tree(qid: str, s: Session = Depends(_db)):
     return nodes[root.id]
 
 
-@router.post("/questions/{qid}/solve")
+@router.post("/questions/{qid}/solve", dependencies=[Depends(require_api_key)])
 def manually_solve(qid: str):
     """Solve a question and return the answer immediately. Reflection (which spawns
     follow-up questions and writes memory) runs in a background thread so the
@@ -1151,8 +1169,10 @@ def report_markdown(insight_id: str, s: Session = Depends(_db)):
 @ttl_cache(5.0)
 def _metrics_payload() -> dict:
     # Cached briefly: the dashboard polls this every few seconds and
-    # compute_score() scans several tables (and writes a snapshot row).
-    return {"current": compute_score(), "history": score_history(days=14)}
+    # compute_score() scans several tables. persist=False so this read path
+    # doesn't append a Metric snapshot row on every poll — history is built by
+    # the autopilot/cycle schedulers instead.
+    return {"current": compute_score(persist=False), "history": score_history(days=14)}
 
 
 @router.get("/metrics")
@@ -1248,6 +1268,7 @@ def jobs_stats(s: Session = Depends(_db)):
 
 # ------------- Live feed (SSE) -------------
 @router.get("/feed/stream")
+@limiter.exempt  # long-lived stream — a default per-minute cap would kill reconnects
 async def feed_stream(backlog: int = Query(20, ge=0, le=200)):
     """Server-sent events of the research feed (Redis-backed pubsub)."""
 
@@ -1262,7 +1283,13 @@ async def feed_stream(backlog: int = Query(20, ge=0, le=200)):
         pubsub.subscribe(redis_client.FEED_KEY)
         try:
             while True:
-                msg = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                # pubsub.get_message blocks up to `timeout`; run it off the event
+                # loop so this coroutine doesn't stall every other request for ~1s
+                # per idle poll (a single SSE client would otherwise serialize the
+                # whole async server).
+                msg = await asyncio.to_thread(
+                    pubsub.get_message, ignore_subscribe_messages=True, timeout=1.0
+                )
                 if msg and msg.get("type") == "message":
                     data = msg.get("data")
                     if isinstance(data, bytes):
@@ -1413,7 +1440,7 @@ def eval_history_route(days: int = 30):
     return eval_history(days=days)
 
 
-@router.post("/feedback")
+@router.post("/feedback", dependencies=[Depends(require_api_key)])
 def submit_feedback(req: FeedbackRequest, s: Session = Depends(_db)):
     fb = Feedback(
         target_kind=req.target_kind, target_id=req.target_id,

@@ -90,7 +90,7 @@ def hybrid_search(
     chunks = _load_chunks(document_id)
     if not chunks:
         # No corpus — return what vector gave us, mapped into Hit shape
-        return _vector_only(v_hits, top_k)
+        return _vector_only(v_hits, top_k, rrf_k)
 
     bm25, _ = _build_bm25([c for c, _ in chunks])
     sparse_ranking: list[tuple[str, str, str]] = []  # (chunk_id, document_id, title)
@@ -169,7 +169,7 @@ def hybrid_search(
     return ranked
 
 
-def _vector_only(v_hits: list[dict], top_k: int) -> list[Hit]:
+def _vector_only(v_hits: list[dict], top_k: int, rrf_k: int = 60) -> list[Hit]:
     out: list[Hit] = []
     for rank, h in enumerate(v_hits[:top_k], start=1):
         p = h.get("payload", {}) or {}
@@ -183,6 +183,6 @@ def _vector_only(v_hits: list[dict], top_k: int) -> list[Hit]:
             text=str(p.get("text") or ""),
             vector_score=float(h.get("score") or 0.0),
             vector_rank=rank,
-            fused_score=1.0 / (60 + rank),
+            fused_score=1.0 / (rrf_k + rank),
         ))
     return out

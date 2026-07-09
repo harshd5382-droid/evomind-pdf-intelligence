@@ -6,6 +6,11 @@ import { Activity } from "lucide-react";
 
 type Ev = { type: string; _event_id?: string; _t?: number; [k: string]: any };
 
+// Stable identity for an event — used for both dedup and React keys.
+const keyFor = (ev: Ev): string =>
+  ev._event_id ||
+  `${ev.type}:${ev._t || 0}:${(ev.text || ev.title || ev.statement || ev.preview || ev.summary || "").slice(0, 80)}`;
+
 const EV_COLOR: Record<string, string> = {
   "document.ingested":     "text-accent2",
   "question.generated":    "text-violet-400",
@@ -38,13 +43,15 @@ export default function FeedPage() {
 
   useEffect(() => {
     let mounted = true;
-    const seen = new Set<string>();
 
+    // Dedup against the current (bounded) item list rather than an ever-growing
+    // Set, so a long-lived stream can't leak memory.
     const mergeEvents = (incoming: Ev[]) => {
       setItems((prev) => {
+        const seen = new Set(prev.map(keyFor));
         const next = [...prev];
         for (const ev of incoming) {
-          const key = ev._event_id || `${ev.type}:${JSON.stringify(ev)}`;
+          const key = keyFor(ev);
           if (seen.has(key)) continue;
           seen.add(key);
           next.push(ev);
@@ -126,7 +133,7 @@ export default function FeedPage() {
             || JSON.stringify(ev).slice(0, 280);
           return (
             <div
-              key={i}
+              key={keyFor(ev)}
               className={`feed-row border-l-2 ${borderCls} pl-4 py-3 border-b border-border/30 animate-fade-in`}
               style={{ animationDelay: `${Math.min(i * 15, 300)}ms` }}
             >
