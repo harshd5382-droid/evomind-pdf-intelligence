@@ -4,6 +4,16 @@
 const RAW = process.env.NEXT_PUBLIC_API_URL || "";
 const BASE = RAW ? `${RAW.replace(/\/$/, "")}/api` : "/api";
 
+// Optional API key for backends running with AUTH_ENABLED=true. NEXT_PUBLIC_*
+// vars are inlined into the browser bundle at build time, so this key is
+// visible to anyone who can load the UI — use it only for trusted/local
+// deployments, and put a real authenticating proxy in front for anything else.
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
+
+// Auth headers for requests that bypass `api()` (multipart uploads, etc.).
+export const authHeaders = (): Record<string, string> =>
+  API_KEY ? { "X-API-Key": API_KEY } : {};
+
 export class ApiError extends Error {
   status: number;
   body: string;
@@ -33,6 +43,7 @@ export async function api<T = any>(
       ...rest,
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders(),
         ...(init.headers || {}),
       },
       cache: "no-store",
@@ -76,7 +87,7 @@ export async function safeWriteText(value: string): Promise<boolean> {
 export async function uploadPdf(file: File) {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}/upload`, { method: "POST", headers: authHeaders(), body: fd });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { FolderUp, Server, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 type Result = { filename?: string; document_id: string; job_id?: string; queued?: boolean; duplicate?: boolean; original_filename?: string };
@@ -40,7 +40,7 @@ export function FolderUpload({ onClose, onDone }: { onClose: () => void; onDone:
         setOutcome({ ok: false, error: "No PDF files found in that folder." });
         return;
       }
-      const res = await fetch(apiUrl("/upload/batch"), { method: "POST", body: fd });
+      const res = await fetch(apiUrl("/upload/batch"), { method: "POST", headers: authHeaders(), body: fd });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setOutcome({ ok: true, count: data.count, new: data.new, duplicates: data.duplicates, items: data.items });
@@ -58,7 +58,7 @@ export function FolderUpload({ onClose, onDone }: { onClose: () => void; onDone:
     try {
       const res = await fetch(apiUrl("/upload/folder"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ path: serverPath.trim(), recursive }),
       });
       if (!res.ok) throw new Error(await res.text());

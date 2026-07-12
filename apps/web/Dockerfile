@@ -13,6 +13,10 @@ COPY . .
 # resolvable from the browser — only from inside the compose network.
 ARG API_PROXY_TARGET
 ENV API_PROXY_TARGET=$API_PROXY_TARGET
+# Optional: inlined into the client bundle so the UI can talk to a backend
+# running with AUTH_ENABLED=true. Anyone who can load the UI can read it.
+ARG NEXT_PUBLIC_API_KEY
+ENV NEXT_PUBLIC_API_KEY=$NEXT_PUBLIC_API_KEY
 RUN npm run build
 
 FROM node:20-alpine AS runner

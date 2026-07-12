@@ -182,6 +182,11 @@ services:
         # resolve. Leave NEXT_PUBLIC_API_URL unset so the client calls the
         # same-origin /api path instead.
         API_PROXY_TARGET: http://api:8000
+        # Optional: lets the UI authenticate when AUTH_ENABLED=true. Inlined
+        # into the browser bundle at build time (visible to anyone who can
+        # load the UI), so only use it for trusted/local deployments. Must be
+        # one of the keys in API_KEYS. Rebuild the web image after changing it.
+        NEXT_PUBLIC_API_KEY: ${NEXT_PUBLIC_API_KEY:-}
     restart: unless-stopped
     ports: ["3000:3000"]
     mem_limit: 1g
