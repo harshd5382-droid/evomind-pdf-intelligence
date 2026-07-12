@@ -147,10 +147,13 @@ The key must appear in the comma-separated `API_KEYS` setting. If you enabled
 auth but left `API_KEYS` empty, the API fails closed with a 503 by design — set
 at least one key. When `AUTH_ENABLED=false` (the default) no key is needed.
 
-> The web UI does not yet attach an API key to its requests, so enabling auth
-> will break UI-driven actions (solve, chat, upload). Run with auth in
-> API-only/proxied deployments, or put the whole stack behind your own
-> authenticating reverse proxy.
+> To keep UI-driven actions (solve, chat, upload) working with auth enabled,
+> set `NEXT_PUBLIC_API_KEY` to one of the keys in `API_KEYS` — the web UI
+> attaches it as `X-API-Key` on every request. The value is inlined into the
+> browser bundle at build time, so rebuild the web image after changing it,
+> and note that anyone who can load the UI can read the key. For untrusted
+> networks, put the whole stack behind your own authenticating reverse proxy
+> instead.
 
 ---
 
